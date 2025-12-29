@@ -6,7 +6,7 @@ local Player = Services.Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local RunService = Services.RunService
 local CoreGui = Services.CoreGui
-local OWNER_ID = 123456789 -- ★UserIdを書き換えてください
+local OWNER_ID = 4666377774 -- ★UserIdを書き換えてください
 
 -- [ 1. 初期設定 & データ管理 ]
 if not _G.NCC_Data then
