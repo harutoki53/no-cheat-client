@@ -58,17 +58,52 @@ end
 Services.Players.PlayerAdded:Connect(createESP)
 for _, p in ipairs(Services.Players:GetPlayers()) do if p ~= Player then createESP(p) end end
 
--- [ 4. UI: メインメニュー ]
+-- [ 4. UI: メインメニュー (修正版) ]
 local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "NCC_UI"
+ScreenGui.DisplayOrder = 10 -- 他のUIより手前に表示
+
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 260, 0, 350)
 MainFrame.Position = UDim2.new(0.5, -130, 0.5, -175)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.Visible = false
+MainFrame.Active = true
+MainFrame.Draggable = true -- 画面内で動かせるようにします
 Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40); Title.Text = "NCC v1.0 by harutoki53"; Title.TextColor3 = Color3.new(1,1,1); Title.BackgroundTransparency = 1;
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "NCC v1.0 by harutoki53"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+
+-- ★ボタン作成関数 (これで確実に項目を表示させます)
+local function addBtn(text, configKey, yPos)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.9, 0, 0, 40)
+    btn.Position = UDim2.new(0.05, 0, 0, yPos)
+    btn.BackgroundColor3 = _G.NCC_Data.Settings[configKey] and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
+    btn.Text = text .. ": " .. (_G.NCC_Data.Settings[configKey] and "ON" or "OFF")
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    Instance.new("UICorner", btn)
+
+    btn.MouseButton1Click:Connect(function()
+        _G.NCC_Data.Settings[configKey] = not _G.NCC_Data.Settings[configKey]
+        btn.Text = text .. ": " .. (_G.NCC_Data.Settings[configKey] and "ON" or "OFF")
+        btn.BackgroundColor3 = _G.NCC_Data.Settings[configKey] and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(150, 50, 50)
+    end)
+end
+
+-- 項目を追加
+addBtn("Status HUD", "HUD", 50)
+addBtn("Inventory HUD", "Inventory", 100)
+addBtn("Anti-Cheat", "AntiCheat", 150)
+addBtn("ESP Master", "ESP", 200)
+addBtn("Fullbright", "Fullbright", 250)
 
 -- 右シフト開閉
 Services.UserInputService.InputBegan:Connect(function(input, gpe)
@@ -76,7 +111,6 @@ Services.UserInputService.InputBegan:Connect(function(input, gpe)
         MainFrame.Visible = not MainFrame.Visible
     end
 end)
-
 -- [ 5. 実行ループ ]
 RunService.Heartbeat:Connect(function()
     if _G.NCC_Data.Settings.AntiCheat then runAntiCheat() end
