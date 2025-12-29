@@ -1,4 +1,4 @@
--- [[ Not Cheat Client v1.0 - REPAIR & CLEAN VERSION ]] --
+-- [[ Not Cheat Client v1.0 - FINAL REPAIR ]] --
 -- Created by harutoki53
 
 local Services = setmetatable({}, {__index = function(t, k) return game:GetService(k) end})
@@ -6,10 +6,10 @@ local Player = Services.Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local RunService = Services.RunService
 local CoreGui = Services.CoreGui
-local OWNER_ID = 4666377774 -- ★必要であれば自分のIDに
+local OWNER_ID = 4666377774
 
--- [ 1. 初期設定 ]
-if not _G.NCC_Data or type(_G.NCC_Data) ~= "table" then
+-- [ 1. データの初期化 ]
+if not _G.NCC_Data then
     _G.NCC_Data = {
         Settings = {HUD = true, Inventory = true, AntiCheat = true, Fullbright = false, ESP = true},
         History = {}
@@ -17,73 +17,96 @@ if not _G.NCC_Data or type(_G.NCC_Data) ~= "table" then
 end
 local startTime = os.time()
 
--- [ 2. メイン UI システム ]
+-- [ 2. UIの土台作成 ]
 local ScreenGui = CoreGui:FindFirstChild("NCC_UI") or Instance.new("ScreenGui", CoreGui)
 ScreenGui.Name = "NCC_UI"
-ScreenGui:ClearAllChildren() -- 古いUIを消す
+ScreenGui:ClearAllChildren()
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 260, 0, 350)
-MainFrame.Position = UDim2.new(0.5, -130, 0.5, -175)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-MainFrame.Visible = false
+MainFrame.Size = UDim2.new(0, 260, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.Visible = false -- 最初は非表示
 MainFrame.Active = true
 MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40); Title.Text = "NCC v1.0 by harutoki53"; Title.TextColor3 = Color3.new(1,1,1); Title.BackgroundTransparency = 1; Title.Font = Enum.Font.GothamBold;
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "NCC v1.0 - harutoki53"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
 
+-- [ 3. ボタン作成関数（ここが重要） ]
 local function addBtn(text, configKey, yPos)
     local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.9, 0, 0, 40); btn.Position = UDim2.new(0.05, 0, 0, yPos);
-    btn.BackgroundColor3 = _G.NCC_Data.Settings[configKey] and Color3.fromRGB(40, 150, 40) or Color3.fromRGB(150, 40, 40)
-    btn.Text = text .. ": " .. (_G.NCC_Data.Settings[configKey] and "ON" or "OFF")
-    btn.TextColor3 = Color3.new(1,1,1); btn.Font = Enum.Font.Gotham; Instance.new("UICorner", btn)
+    btn.Size = UDim2.new(0.9, 0, 0, 40)
+    btn.Position = UDim2.new(0.05, 0, 0, yPos)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", btn)
+
+    local function updateVisuals()
+        local isOn = _G.NCC_Data.Settings[configKey]
+        btn.Text = text .. ": " .. (isOn and "ON" or "OFF")
+        btn.BackgroundColor3 = isOn and Color3.fromRGB(40, 150, 40) or Color3.fromRGB(150, 40, 40)
+    end
 
     btn.MouseButton1Click:Connect(function()
         _G.NCC_Data.Settings[configKey] = not _G.NCC_Data.Settings[configKey]
-        btn.Text = text .. ": " .. (_G.NCC_Data.Settings[configKey] and "ON" or "OFF")
-        btn.BackgroundColor3 = _G.NCC_Data.Settings[configKey] and Color3.fromRGB(40, 150, 40) or Color3.fromRGB(150, 40, 40)
+        updateVisuals()
     end)
+    updateVisuals()
 end
 
+-- ボタンを配置
 addBtn("Status HUD", "HUD", 60)
 addBtn("Anti-Cheat", "AntiCheat", 110)
 addBtn("ESP System", "ESP", 160)
 addBtn("Fullbright", "Fullbright", 210)
 
--- [ 3. ステータス HUD ]
+-- [ 4. HUD表示用ラベル ]
 local infoFrame = Instance.new("Frame", ScreenGui)
-infoFrame.Size = UDim2.new(0, 220, 0, 140); infoFrame.Position = UDim2.new(0, 10, 0.5, -70);
-infoFrame.BackgroundColor3 = Color3.new(0,0,0); infoFrame.BackgroundTransparency = 0.5; Instance.new("UICorner", infoFrame)
+infoFrame.Size = UDim2.new(0, 200, 0, 100)
+infoFrame.Position = UDim2.new(0, 10, 0.5, -50)
+infoFrame.BackgroundColor3 = Color3.new(0,0,0)
+infoFrame.BackgroundTransparency = 0.5
+Instance.new("UICorner", infoFrame)
+
 local statsLabel = Instance.new("TextLabel", infoFrame)
-statsLabel.Size = UDim2.new(1,-10,1,-10); statsLabel.Position = UDim2.new(0,5,0,5);
-statsLabel.TextColor3 = Color3.new(1,1,1); statsLabel.BackgroundTransparency = 1; statsLabel.TextXAlignment = Enum.TextXAlignment.Left; statsLabel.Font = Enum.Font.Code;
+statsLabel.Size = UDim2.new(1, -10, 1, -10)
+statsLabel.Position = UDim2.new(0, 5, 0, 5)
+statsLabel.TextColor3 = Color3.new(1,1,1)
+statsLabel.BackgroundTransparency = 1
+statsLabel.TextXAlignment = Enum.TextXAlignment.Left
+statsLabel.Font = Enum.Font.Code
+statsLabel.TextSize = 13
 
--- [ 4. メインループ ]
+-- [ 5. 実行ループ ]
 RunService.RenderStepped:Connect(function()
+    infoFrame.Visible = _G.NCC_Data.Settings.HUD
     if _G.NCC_Data.Settings.HUD then
-        infoFrame.Visible = true
-        local fps = math.floor(1 / RunService.RenderStepped:Wait())
         local ping = math.floor(Player:GetNetworkPing() * 1000)
-        local speed = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") and math.floor(Player.Character.HumanoidRootPart.Velocity.Magnitude) or 0
-        local playtime = os.time() - startTime
-        statsLabel.Text = string.format("FPS: %d\nPING: %d ms\nSPEED: %d\nTIME: %dm %ds", fps, ping, speed, math.floor(playtime/60), playtime%60)
-    else
-        infoFrame.Visible = false
+        statsLabel.Text = string.format("PING: %dms\nTIME: %ds\nUSER: %s", ping, os.time()-startTime, Player.Name)
+    end
+    if _G.NCC_Data.Settings.Fullbright then
+        Services.Lighting.Brightness = 2
+        Services.Lighting.ClockTime = 14
     end
 end)
 
--- Shiftキーの処理を一番最後に確実に追加
+-- キー入力の設定
 Services.UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
         MainFrame.Visible = not MainFrame.Visible
-        print("Menu Toggled: " .. tostring(MainFrame.Visible)) -- 動作確認用
     end
 end)
 
-warn("NCC: Fixed Version Loaded. Press RightShift to Open.")
+warn("NCC System Fully Initialized.")
 -- ==========================================
 -- 6. 高度なステータス HUD (リアルタイム監視)
 -- ==========================================
