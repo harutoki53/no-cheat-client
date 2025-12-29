@@ -1,4 +1,4 @@
--- [[ Not Cheat Client v1.0 - REPAIR & FULL INTEGRATED ]] --
+-- [[ Not Cheat Client v1.0 - FINAL STABLE VERSION ]] --
 -- Created by harutoki53
 
 local Services = setmetatable({}, {__index = function(t, k) return game:GetService(k) end})
@@ -6,9 +6,9 @@ local Player = Services.Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local RunService = Services.RunService
 local CoreGui = Services.CoreGui
-local OWNER_ID = 123456789 -- ★あなたのUserId
+local OWNER_ID = 123456789 -- ★UserIdを書き換えてください
 
--- [ 1. 初期設定 ]
+-- [ 1. 初期設定 & データ管理 ]
 if not _G.NCC_Data then
     _G.NCC_Data = {
         Settings = {HUD = true, Inventory = true, AntiCheat = true, Fullbright = false, ESP = true},
@@ -38,37 +38,10 @@ local function runAntiCheat()
     end
 end
 
--- [ 3. ESP ]
-local function createESP(p)
-    RunService.RenderStepped:Connect(function()
-        if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and _G.NCC_Data.Settings.ESP then
-            local hrp = p.Character.HumanoidRootPart
-            local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
-            local old = CoreGui:FindFirstChild("ESP_" .. p.Name)
-            if old then old:Destroy() end
-            if onScreen then
-                local folder = Instance.new("Folder", CoreGui)
-                folder.Name = "ESP_" .. p.Name
-                local box = Instance.new("Frame", folder)
-                box.Size = UDim2.new(0, 50, 0, 50)
-                box.Position = UDim2.new(0, pos.X - 25, 0, pos.Y - 25)
-                box.BackgroundTransparency = 1
-                box.BorderSizePixel = 2
-                box.BorderColor3 = _G.NCC_Data.History[p.UserId] and Color3.new(1,0,0) or Color3.new(1,1,1)
-            end
-        else
-            local old = CoreGui:FindFirstChild("ESP_" .. p.Name)
-            if old then old:Destroy() end
-        end
-    end)
-end
-Services.Players.PlayerAdded:Connect(createESP)
-for _, p in ipairs(Services.Players:GetPlayers()) do if p ~= Player then createESP(p) end end
-
--- [ 4. メイン UI (エラー修正済み) ]
-local ScreenGui = Instance.new("ScreenGui", CoreGui)
+-- [ 3. メイン UI システム ]
+local ScreenGui = CoreGui:FindFirstChild("NCC_UI") or Instance.new("ScreenGui", CoreGui)
 ScreenGui.Name = "NCC_UI"
-ScreenGui.DisplayOrder = 999
+ScreenGui:ClearAllChildren() -- 重複防止のために一度クリア
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 260, 0, 350)
@@ -80,7 +53,7 @@ MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40); Title.Text = "NCC v1.0 - harutoki53"; Title.TextColor3 = Color3.new(1,1,1); Title.BackgroundTransparency = 1; Title.Font = Enum.Font.GothamBold;
+Title.Size = UDim2.new(1, 0, 0, 40); Title.Text = "NCC v1.0 by harutoki53"; Title.TextColor3 = Color3.new(1,1,1); Title.BackgroundTransparency = 1; Title.Font = Enum.Font.GothamBold;
 
 local function addBtn(text, configKey, yPos)
     local btn = Instance.new("TextButton", MainFrame)
@@ -101,59 +74,30 @@ addBtn("Anti-Cheat", "AntiCheat", 110)
 addBtn("ESP System", "ESP", 160)
 addBtn("Fullbright", "Fullbright", 210)
 
--- [ 5. HUD 表示 ]
+-- [ 4. ステータス HUD ]
 local infoFrame = Instance.new("Frame", ScreenGui)
-infoFrame.Size = UDim2.new(0, 200, 0, 100); infoFrame.Position = UDim2.new(0, 10, 0.5, -50);
+infoFrame.Size = UDim2.new(0, 220, 0, 140); infoFrame.Position = UDim2.new(0, 10, 0.5, -70);
 infoFrame.BackgroundColor3 = Color3.new(0,0,0); infoFrame.BackgroundTransparency = 0.5; Instance.new("UICorner", infoFrame)
 local statsLabel = Instance.new("TextLabel", infoFrame)
 statsLabel.Size = UDim2.new(1,-10,1,-10); statsLabel.Position = UDim2.new(0,5,0,5);
 statsLabel.TextColor3 = Color3.new(1,1,1); statsLabel.BackgroundTransparency = 1; statsLabel.TextXAlignment = Enum.TextXAlignment.Left; statsLabel.Font = Enum.Font.Code;
 
--- ループ処理
-RunService.RenderStepped:Connect(function()
-    if _G.NCC_Data.Settings.HUD then
-        infoFrame.Visible = true
-        local fps = math.floor(1 / RunService.RenderStepped:Wait())
-        local ping = math.floor(Player:GetNetworkPing() * 1000)
-        statsLabel.Text = string.format("FPS: %d\nPING: %d ms\nTIME: %d s", fps, ping, os.time()-startTime)
-    else
-        infoFrame.Visible = false
-    end
-end)
-
-Services.UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
-        MainFrame.Visible = not MainFrame.Visible
-    end
-end)
-
-RunService.Heartbeat:Connect(function()
-    if _G.NCC_Data.Settings.AntiCheat then runAntiCheat() end
-end)
-
-warn("NCC: Fixed & Final Build Loaded.")
--- [ 5. 実行ループ & HUD ]
-local infoFrame = Instance.new("Frame", ScreenGui)
-infoFrame.Size = UDim2.new(0, 220, 0, 140)
-infoFrame.Position = UDim2.new(0, 10, 0.5, -70)
-infoFrame.BackgroundColor3 = Color3.new(0,0,0)
-infoFrame.BackgroundTransparency = 0.5
-Instance.new("UICorner", infoFrame)
-
-local statsLabel = Instance.new("TextLabel", infoFrame)
-statsLabel.Size = UDim2.new(1,-10,1,-10); statsLabel.Position = UDim2.new(0,5,0,5);
-statsLabel.TextColor3 = Color3.new(1,1,1); statsLabel.BackgroundTransparency = 1;
-statsLabel.TextXAlignment = Enum.TextXAlignment.Left; statsLabel.Font = Enum.Font.Code;
-
+-- [ 5. メインループ ]
 RunService.RenderStepped:Connect(function()
     if _G.NCC_Data.Settings.HUD then
         infoFrame.Visible = true
         local fps = math.floor(1 / RunService.RenderStepped:Wait())
         local ping = math.floor(Player:GetNetworkPing() * 1000)
         local speed = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") and math.floor(Player.Character.HumanoidRootPart.Velocity.Magnitude) or 0
-        statsLabel.Text = string.format("FPS: %d\nPING: %d ms\nSPEED: %d\nTIME: %d s", fps, ping, speed, os.time()-startTime)
+        local playtime = os.time() - startTime
+        statsLabel.Text = string.format("FPS: %d\nPING: %d ms\nSPEED: %d\nTIME: %dm %ds", fps, ping, speed, math.floor(playtime/60), playtime%60)
     else
         infoFrame.Visible = false
+    end
+    
+    if _G.NCC_Data.Settings.Fullbright then
+        Services.Lighting.Brightness = 2
+        Services.Lighting.ClockTime = 14
     end
 end)
 
@@ -167,7 +111,7 @@ RunService.Heartbeat:Connect(function()
     if _G.NCC_Data.Settings.AntiCheat then runAntiCheat() end
 end)
 
-warn("NCC: All Systems Functional.")
+warn("NCC: System Fully Loaded and Cleaned.")
 -- ==========================================
 -- 6. 高度なステータス HUD (リアルタイム監視)
 -- ==========================================
