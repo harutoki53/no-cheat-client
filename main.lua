@@ -1,4 +1,4 @@
--- [[ Not Cheat Client v1.0 - FINAL STABLE VERSION ]] --
+-- [[ Not Cheat Client v1.0 - REPAIR & CLEAN VERSION ]] --
 -- Created by harutoki53
 
 local Services = setmetatable({}, {__index = function(t, k) return game:GetService(k) end})
@@ -6,42 +6,21 @@ local Player = Services.Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local RunService = Services.RunService
 local CoreGui = Services.CoreGui
-local OWNER_ID = 4666377774 -- ★UserIdを書き換えてください
+local OWNER_ID = 4666377774 -- ★必要であれば自分のIDに
 
--- [ 1. 初期設定 & データ管理 ]
-if not _G.NCC_Data then
+-- [ 1. 初期設定 ]
+if not _G.NCC_Data or type(_G.NCC_Data) ~= "table" then
     _G.NCC_Data = {
         Settings = {HUD = true, Inventory = true, AntiCheat = true, Fullbright = false, ESP = true},
         History = {}
     }
 end
-local lastPosMap = {}
 local startTime = os.time()
 
--- [ 2. 物理演算アンチチート ]
-local function runAntiCheat()
-    for _, other in ipairs(Services.Players:GetPlayers()) do
-        if other == Player or not other.Character or not other.Character:FindFirstChild("HumanoidRootPart") then continue end
-        local hrp = other.Character.HumanoidRootPart
-        local hum = other.Character:FindFirstChildOfClass("Humanoid")
-        if not hum then continue end
-        
-        local currentPos = hrp.Position
-        if lastPosMap[other] then
-            local dist = (currentPos - lastPosMap[other].pos).Magnitude
-            local dt = tick() - lastPosMap[other].time
-            if dt > 0 and (dist / dt) > (hum.WalkSpeed + 25) then
-                _G.NCC_Data.History[other.UserId] = "Speed/TP Detect"
-            end
-        end
-        lastPosMap[other] = {pos = currentPos, time = tick()}
-    end
-end
-
--- [ 3. メイン UI システム ]
+-- [ 2. メイン UI システム ]
 local ScreenGui = CoreGui:FindFirstChild("NCC_UI") or Instance.new("ScreenGui", CoreGui)
 ScreenGui.Name = "NCC_UI"
-ScreenGui:ClearAllChildren() -- 重複防止のために一度クリア
+ScreenGui:ClearAllChildren() -- 古いUIを消す
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 260, 0, 350)
@@ -74,7 +53,7 @@ addBtn("Anti-Cheat", "AntiCheat", 110)
 addBtn("ESP System", "ESP", 160)
 addBtn("Fullbright", "Fullbright", 210)
 
--- [ 4. ステータス HUD ]
+-- [ 3. ステータス HUD ]
 local infoFrame = Instance.new("Frame", ScreenGui)
 infoFrame.Size = UDim2.new(0, 220, 0, 140); infoFrame.Position = UDim2.new(0, 10, 0.5, -70);
 infoFrame.BackgroundColor3 = Color3.new(0,0,0); infoFrame.BackgroundTransparency = 0.5; Instance.new("UICorner", infoFrame)
@@ -82,7 +61,7 @@ local statsLabel = Instance.new("TextLabel", infoFrame)
 statsLabel.Size = UDim2.new(1,-10,1,-10); statsLabel.Position = UDim2.new(0,5,0,5);
 statsLabel.TextColor3 = Color3.new(1,1,1); statsLabel.BackgroundTransparency = 1; statsLabel.TextXAlignment = Enum.TextXAlignment.Left; statsLabel.Font = Enum.Font.Code;
 
--- [ 5. メインループ ]
+-- [ 4. メインループ ]
 RunService.RenderStepped:Connect(function()
     if _G.NCC_Data.Settings.HUD then
         infoFrame.Visible = true
@@ -94,24 +73,17 @@ RunService.RenderStepped:Connect(function()
     else
         infoFrame.Visible = false
     end
-    
-    if _G.NCC_Data.Settings.Fullbright then
-        Services.Lighting.Brightness = 2
-        Services.Lighting.ClockTime = 14
-    end
 end)
 
+-- Shiftキーの処理を一番最後に確実に追加
 Services.UserInputService.InputBegan:Connect(function(input, gpe)
     if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
         MainFrame.Visible = not MainFrame.Visible
+        print("Menu Toggled: " .. tostring(MainFrame.Visible)) -- 動作確認用
     end
 end)
 
-RunService.Heartbeat:Connect(function()
-    if _G.NCC_Data.Settings.AntiCheat then runAntiCheat() end
-end)
-
-warn("NCC: System Fully Loaded and Cleaned.")
+warn("NCC: Fixed Version Loaded. Press RightShift to Open.")
 -- ==========================================
 -- 6. 高度なステータス HUD (リアルタイム監視)
 -- ==========================================
