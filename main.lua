@@ -1,4 +1,4 @@
--- [[ Not Cheat Client v1.0 - ULTIMATE INTEGRATED ]] --
+-- [[ Not Cheat Client v1.0 - THE FINAL SOURCE ]] --
 -- Created by harutoki53
 
 local Services = setmetatable({}, {__index = function(t, k) return game:GetService(k) end})
@@ -6,7 +6,7 @@ local Player = Services.Players.LocalPlayer
 local Mouse = Player:GetMouse()
 local RunService = Services.RunService
 local CoreGui = Services.CoreGui
-local OWNER_ID = 4666377774 -- ★あなたのUserIdに書き換えてください
+local OWNER_ID = 123456789 -- ★あなたのUserIdに書き換えてください
 
 -- [ 1. グローバルデータ管理 ]
 _G.NCC_Data = {
@@ -34,7 +34,7 @@ local function runAntiCheat()
     end
 end
 
--- [ 3. ESP (壁越し表示) ]
+-- [ 3. ESP (壁越し表示 & スケルトン統合) ]
 local function createESP(p)
     RunService.RenderStepped:Connect(function()
         if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and _G.NCC_Data.Settings.ESP then
@@ -58,10 +58,10 @@ end
 Services.Players.PlayerAdded:Connect(createESP)
 for _, p in ipairs(Services.Players:GetPlayers()) do if p ~= Player then createESP(p) end end
 
--- [ 4. UI: メインメニュー (修正版) ]
+-- [ 4. UI: メインメニュー (表示不具合修正版) ]
 local ScreenGui = Instance.new("ScreenGui", CoreGui)
 ScreenGui.Name = "NCC_UI"
-ScreenGui.DisplayOrder = 10 -- 他のUIより手前に表示
+ScreenGui.DisplayOrder = 999
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 260, 0, 350)
@@ -69,7 +69,7 @@ MainFrame.Position = UDim2.new(0.5, -130, 0.5, -175)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.Visible = false
 MainFrame.Active = true
-MainFrame.Draggable = true -- 画面内で動かせるようにします
+MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel", MainFrame)
@@ -79,7 +79,6 @@ Title.TextColor3 = Color3.new(1,1,1)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
 
--- ★ボタン作成関数 (これで確実に項目を表示させます)
 local function addBtn(text, configKey, yPos)
     local btn = Instance.new("TextButton", MainFrame)
     btn.Size = UDim2.new(0.9, 0, 0, 40)
@@ -88,7 +87,7 @@ local function addBtn(text, configKey, yPos)
     btn.Text = text .. ": " .. (_G.NCC_Data.Settings[configKey] and "ON" or "OFF")
     btn.TextColor3 = Color3.new(1,1,1)
     btn.Font = Enum.Font.Gotham
-    btn.TextSize = 14
+    btn.ZIndex = 1000 -- ボタンを最前面に
     Instance.new("UICorner", btn)
 
     btn.MouseButton1Click:Connect(function()
@@ -98,25 +97,48 @@ local function addBtn(text, configKey, yPos)
     end)
 end
 
--- 項目を追加
 addBtn("Status HUD", "HUD", 50)
 addBtn("Inventory HUD", "Inventory", 100)
 addBtn("Anti-Cheat", "AntiCheat", 150)
 addBtn("ESP Master", "ESP", 200)
 addBtn("Fullbright", "Fullbright", 250)
 
--- 右シフト開閉
+-- [ 5. 実行ループ & HUD ]
+local infoFrame = Instance.new("Frame", ScreenGui)
+infoFrame.Size = UDim2.new(0, 220, 0, 140)
+infoFrame.Position = UDim2.new(0, 10, 0.5, -70)
+infoFrame.BackgroundColor3 = Color3.new(0,0,0)
+infoFrame.BackgroundTransparency = 0.5
+Instance.new("UICorner", infoFrame)
+
+local statsLabel = Instance.new("TextLabel", infoFrame)
+statsLabel.Size = UDim2.new(1,-10,1,-10); statsLabel.Position = UDim2.new(0,5,0,5);
+statsLabel.TextColor3 = Color3.new(1,1,1); statsLabel.BackgroundTransparency = 1;
+statsLabel.TextXAlignment = Enum.TextXAlignment.Left; statsLabel.Font = Enum.Font.Code;
+
+RunService.RenderStepped:Connect(function()
+    if _G.NCC_Data.Settings.HUD then
+        infoFrame.Visible = true
+        local fps = math.floor(1 / RunService.RenderStepped:Wait())
+        local ping = math.floor(Player:GetNetworkPing() * 1000)
+        local speed = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") and math.floor(Player.Character.HumanoidRootPart.Velocity.Magnitude) or 0
+        statsLabel.Text = string.format("FPS: %d\nPING: %d ms\nSPEED: %d\nTIME: %d s", fps, ping, speed, os.time()-startTime)
+    else
+        infoFrame.Visible = false
+    end
+end)
+
 Services.UserInputService.InputBegan:Connect(function(input, gpe)
     if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
         MainFrame.Visible = not MainFrame.Visible
     end
 end)
--- [ 5. 実行ループ ]
+
 RunService.Heartbeat:Connect(function()
     if _G.NCC_Data.Settings.AntiCheat then runAntiCheat() end
 end)
 
-warn("Not Cheat Client: GitHub Source Loaded Successfully.")
+warn("NCC: All Systems Functional.")
 -- ==========================================
 -- 6. 高度なステータス HUD (リアルタイム監視)
 -- ==========================================
