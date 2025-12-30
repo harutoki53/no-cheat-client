@@ -1,4 +1,4 @@
--- [[ Not Cheat Client v1.0 - FINAL REPAIR ]] --
+-- [[ Not Cheat Client v1.1 - ERROR FIXED & SKELETON ADDED ]] --
 -- Created by harutoki53
 
 local Services = setmetatable({}, {__index = function(t, k) return game:GetService(k) end})
@@ -8,7 +8,7 @@ local RunService = Services.RunService
 local CoreGui = Services.CoreGui
 local OWNER_ID = 4666377774
 
--- [ 1. データの初期化 ]
+-- [ 1. 初期設定 ]
 if not _G.NCC_Data then
     _G.NCC_Data = {
         Settings = {HUD = true, Inventory = true, AntiCheat = true, Fullbright = false, ESP = true},
@@ -17,96 +17,98 @@ if not _G.NCC_Data then
 end
 local startTime = os.time()
 
--- [ 2. UIの土台作成 ]
+-- [ 2. UI基盤の構築 ]
 local ScreenGui = CoreGui:FindFirstChild("NCC_UI") or Instance.new("ScreenGui", CoreGui)
 ScreenGui.Name = "NCC_UI"
 ScreenGui:ClearAllChildren()
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 260, 0, 300)
-MainFrame.Position = UDim2.new(0.5, -130, 0.5, -150)
+MainFrame.Size = UDim2.new(0, 260, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -160)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-MainFrame.Visible = false -- 最初は非表示
+MainFrame.Visible = false
 MainFrame.Active = true
 MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "NCC v1.0 - harutoki53"
-Title.TextColor3 = Color3.new(1,1,1)
-Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
+Title.Size = UDim2.new(1, 0, 0, 40); Title.Text = "NCC v1.1 - harutoki53"; Title.TextColor3 = Color3.new(1,1,1); Title.BackgroundTransparency = 1; Title.Font = Enum.Font.GothamBold;
 
--- [ 3. ボタン作成関数（ここが重要） ]
+-- [ 3. ボタン作成（エラー回避型） ]
 local function addBtn(text, configKey, yPos)
     local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.9, 0, 0, 40)
-    btn.Position = UDim2.new(0.05, 0, 0, yPos)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 14
-    btn.TextColor3 = Color3.new(1,1,1)
-    Instance.new("UICorner", btn)
+    btn.Size = UDim2.new(0.9, 0, 0, 40); btn.Position = UDim2.new(0.05, 0, 0, yPos);
+    btn.Font = Enum.Font.Gotham; btn.TextSize = 14; btn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", btn)
 
-    local function updateVisuals()
+    local function update()
         local isOn = _G.NCC_Data.Settings[configKey]
         btn.Text = text .. ": " .. (isOn and "ON" or "OFF")
-        btn.BackgroundColor3 = isOn and Color3.fromRGB(40, 150, 40) or Color3.fromRGB(150, 40, 40)
+        btn.BackgroundColor3 = isOn and Color3.fromRGB(45, 160, 45) or Color3.fromRGB(160, 45, 45)
     end
-
-    btn.MouseButton1Click:Connect(function()
-        _G.NCC_Data.Settings[configKey] = not _G.NCC_Data.Settings[configKey]
-        updateVisuals()
-    end)
-    updateVisuals()
+    btn.MouseButton1Click:Connect(function() _G.NCC_Data.Settings[configKey] = not _G.NCC_Data.Settings[configKey]; update() end)
+    update()
 end
 
--- ボタンを配置
 addBtn("Status HUD", "HUD", 60)
-addBtn("Anti-Cheat", "AntiCheat", 110)
-addBtn("ESP System", "ESP", 160)
-addBtn("Fullbright", "Fullbright", 210)
+addBtn("ESP System", "ESP", 110)
+addBtn("Fullbright", "Fullbright", 160)
+addBtn("Anti-Cheat", "AntiCheat", 210)
 
--- [ 4. HUD表示用ラベル ]
+-- [ 4. HUD表示 ]
 local infoFrame = Instance.new("Frame", ScreenGui)
-infoFrame.Size = UDim2.new(0, 200, 0, 100)
-infoFrame.Position = UDim2.new(0, 10, 0.5, -50)
-infoFrame.BackgroundColor3 = Color3.new(0,0,0)
-infoFrame.BackgroundTransparency = 0.5
-Instance.new("UICorner", infoFrame)
-
+infoFrame.Size = UDim2.new(0, 200, 0, 80); infoFrame.Position = UDim2.new(0, 10, 0.5, -40);
+infoFrame.BackgroundColor3 = Color3.new(0,0,0); infoFrame.BackgroundTransparency = 0.5; Instance.new("UICorner", infoFrame)
 local statsLabel = Instance.new("TextLabel", infoFrame)
-statsLabel.Size = UDim2.new(1, -10, 1, -10)
-statsLabel.Position = UDim2.new(0, 5, 0, 5)
-statsLabel.TextColor3 = Color3.new(1,1,1)
-statsLabel.BackgroundTransparency = 1
-statsLabel.TextXAlignment = Enum.TextXAlignment.Left
-statsLabel.Font = Enum.Font.Code
-statsLabel.TextSize = 13
+statsLabel.Size = UDim2.new(1,-10,1,-10); statsLabel.Position = UDim2.new(0,5,0,5);
+statsLabel.TextColor3 = Color3.new(1,1,1); statsLabel.BackgroundTransparency = 1; statsLabel.Font = Enum.Font.Code; statsLabel.TextSize = 12;
 
--- [ 5. 実行ループ ]
+-- [ 5. スケルトンESP機能 ]
+local function createSkeleton(char)
+    if char == Player.Character then return end
+    local folder = Instance.new("Folder", ScreenGui)
+    folder.Name = "Skel_" .. char.Name
+    local connections = {
+        {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
+        {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"},
+        {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"},
+        {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"},
+        {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}
+    }
+    RunService.RenderStepped:Connect(function()
+        folder:ClearAllChildren()
+        if not char:IsDescendantOf(workspace) or not _G.NCC_Data.Settings.ESP then return end
+        for _, pair in ipairs(connections) do
+            local p1, p2 = char:FindFirstChild(pair[1]), char:FindFirstChild(pair[2])
+            if p1 and p2 then
+                local pos1, vis1 = workspace.CurrentCamera:WorldToViewportPoint(p1.Position)
+                local pos2, vis2 = workspace.CurrentCamera:WorldToViewportPoint(p2.Position)
+                if vis1 and vis2 then
+                    local l = Instance.new("Frame", folder); l.BackgroundColor3 = Color3.new(0, 1, 0.5); l.BorderSizePixel = 0;
+                    local dist = Vector2.new(pos1.X - pos2.X, pos1.Y - pos2.Y)
+                    l.Size = UDim2.new(0, dist.Magnitude, 0, 1); l.Position = UDim2.new(0, (pos1.X + pos2.X)/2, 0, (pos1.Y + pos2.Y)/2); l.Rotation = math.atan2(dist.Y, dist.X) * (180 / math.pi)
+                end
+            end
+        end
+    end)
+end
+
+-- [ 6. メインループ & 制御 ]
 RunService.RenderStepped:Connect(function()
     infoFrame.Visible = _G.NCC_Data.Settings.HUD
     if _G.NCC_Data.Settings.HUD then
-        local ping = math.floor(Player:GetNetworkPing() * 1000)
-        statsLabel.Text = string.format("PING: %dms\nTIME: %ds\nUSER: %s", ping, os.time()-startTime, Player.Name)
+        statsLabel.Text = string.format("PING: %dms\nUSER: %s\nESP: %s", math.floor(Player:GetNetworkPing()*1000), Player.Name, _G.NCC_Data.Settings.ESP and "READY" or "OFF")
     end
-    if _G.NCC_Data.Settings.Fullbright then
-        Services.Lighting.Brightness = 2
-        Services.Lighting.ClockTime = 14
-    end
+    if _G.NCC_Data.Settings.Fullbright then Services.Lighting.Brightness = 2; Services.Lighting.ClockTime = 14 end
 end)
 
--- キー入力の設定
 Services.UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        MainFrame.Visible = not MainFrame.Visible
-    end
+    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then MainFrame.Visible = not MainFrame.Visible end
 end)
 
-warn("NCC System Fully Initialized.")
+for _, p in ipairs(Services.Players:GetPlayers()) do if p.Character then createSkeleton(p.Character) end p.CharacterAdded:Connect(createSkeleton) end
+Services.Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Connect(createSkeleton) end)
+
+warn("NCC v1.1 Loaded Successfully.")
 -- ==========================================
 -- 6. 高度なステータス HUD (リアルタイム監視)
 -- ==========================================
