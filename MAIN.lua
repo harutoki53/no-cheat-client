@@ -1,4 +1,4 @@
--- Rivals Script: Final God Mode Hybrid (Perfect Visual + Functional)
+-- Rivals Script: Harutoki Ultimate (Exact Image Layout)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -8,44 +8,37 @@ local config = {
     aimbot = true,
     autoFire = true,
     wallCheck = true,
-    isPC = true,      -- PCかスマホか
+    isPC = true,
     smooth = 0.4,
-    fov = 150,        -- スマホ用FOV
-    pcFov = 800,      -- PC用FOV（固定）
+    fov = 150,
+    pcFov = 800,
     maxDistance = 1000,
     menuOpen = false
 }
 
--- UIの親を取得（最も安定する方法）
 local gui = Instance.new("ScreenGui")
 gui.Name = "HarutokiUltimate"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = LP:WaitForChild("PlayerGui")
 
--- 古いGUIを消去
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
 
--- --- FOV円 (スマホ専用) ---
+-- --- FOV円 ---
 local fovCircle = Instance.new("Frame", gui)
 fovCircle.BackgroundColor3 = Color3.new(1, 1, 1); fovCircle.BackgroundTransparency = 0.9
 fovCircle.AnchorPoint = Vector2.new(0.5, 0.5); fovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
 Instance.new("UICorner", fovCircle).CornerRadius = UDim.new(1, 0)
 Instance.new("UIStroke", fovCircle).Color = Color3.new(1, 1, 1)
 
--- --- 設定ウィンドウ ---
+-- --- メインUI ---
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 280); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -140)
 menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.BackgroundTransparency = 0.1; menuFrame.Visible = false
 Instance.new("UICorner", menuFrame); Instance.new("UIStroke", menuFrame).Color = Color3.new(1, 1, 1)
 
-local title = Instance.new("TextLabel", menuFrame)
-title.Size = UDim2.new(1, 0, 0, 40); title.Text = "HARUTOKI SETTINGS"; title.TextColor3 = Color3.new(1, 1, 1)
-title.BackgroundTransparency = 1; title.TextScaled = true; title.Font = Enum.Font.RobotoMono
-
--- --- ボタン作成 ---
 local function createMenuBtn(txt, y)
     local b = Instance.new("TextButton", menuFrame)
     b.Size = UDim2.new(0.9, 0, 0, 35); b.Position = UDim2.new(0.05, 0, 0, y)
@@ -53,30 +46,19 @@ local function createMenuBtn(txt, y)
     Instance.new("UICorner", b); return b
 end
 
-local aimBtn = createMenuBtn("AIMBOT", 50)
-local fireBtn = createMenuBtn("AUTO FIRE", 95)
-local wallBtn = createMenuBtn("FILTER", 140)
-local fovBtn = createMenuBtn("MOBILE FOV", 185) -- PC版では消す
-local closeBtn = createMenuBtn("CLOSE", 230); closeBtn.BackgroundColor3 = Color3.new(0.4, 0.1, 0.1)
+local aimBtn = createMenuBtn("AIMBOT", 50); local fireBtn = createMenuBtn("AUTO FIRE", 95); local wallBtn = createMenuBtn("FILTER", 140); local fovBtn = createMenuBtn("MOBILE FOV", 185); local closeBtn = createMenuBtn("CLOSE", 230); closeBtn.BackgroundColor3 = Color3.new(0.4, 0.1, 0.1)
 
--- モード切替ボタン
 local modeToggle = Instance.new("TextButton", gui)
 modeToggle.Size = UDim2.new(0, 160, 0, 35); modeToggle.Position = UDim2.new(0, 10, 0, 10)
 modeToggle.BackgroundColor3 = Color3.new(0, 0, 0); modeToggle.BackgroundTransparency = 0.5; modeToggle.TextColor3 = Color3.new(1, 1, 1); modeToggle.TextScaled = true; modeToggle.Font = Enum.Font.RobotoMono; Instance.new("UIStroke", modeToggle)
 
 local function updateUI()
     modeToggle.Text = "MODE: " .. (config.isPC and "PC" or "MOBILE")
-    menuFrame.Visible = config.menuOpen
-    fovBtn.Visible = not config.isPC -- PCなら消す
-    fovCircle.Visible = (not config.isPC and config.aimbot)
-    fovCircle.Size = UDim2.new(0, config.fov * 2, 0, config.fov * 2)
-    aimBtn.Text = "AIMBOT: " .. (config.aimbot and "ON" or "OFF")
-    fireBtn.Text = "AUTO FIRE: " .. (config.autoFire and "ON" or "OFF")
-    wallBtn.Text = "FILTER: " .. (config.wallCheck and "ON" or "OFF")
-    fovBtn.Text = "MOBILE FOV: " .. config.fov
+    menuFrame.Visible = config.menuOpen; fovBtn.Visible = not config.isPC
+    fovCircle.Visible = (not config.isPC and config.aimbot); fovCircle.Size = UDim2.new(0, config.fov * 2, 0, config.fov * 2)
+    aimBtn.Text = "AIMBOT: " .. (config.aimbot and "ON" or "OFF"); fireBtn.Text = "AUTO FIRE: " .. (config.autoFire and "ON" or "OFF"); wallBtn.Text = "FILTER: " .. (config.wallCheck and "ON" or "OFF"); fovBtn.Text = "MOBILE FOV: " .. config.fov
 end
 
--- --- インタラクション ---
 modeToggle.MouseButton1Click:Connect(function() config.isPC = not config.isPC; config.menuOpen = false; updateUI() end)
 closeBtn.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 aimBtn.MouseButton1Click:Connect(function() config.aimbot = not config.aimbot; updateUI() end)
@@ -85,33 +67,32 @@ wallBtn.MouseButton1Click:Connect(function() config.wallCheck = not config.wallC
 fovBtn.MouseButton1Click:Connect(function() config.fov = (config.fov >= 450) and 100 or config.fov + 50; updateUI() end)
 
 U.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == Enum.KeyCode.RightShift and config.isPC then config.menuOpen = not config.menuOpen; updateUI()
-    elseif input.KeyCode == Enum.KeyCode.J then config.wallCheck = not config.wallCheck; updateUI() end
+    if not gpe then
+        if input.KeyCode == Enum.KeyCode.RightShift and config.isPC then config.menuOpen = not config.menuOpen; updateUI()
+        elseif input.KeyCode == Enum.KeyCode.J then config.wallCheck = not config.wallCheck; updateUI() end
+    end
 end)
 
--- --- ESPライン作成関数 (詳細版) ---
-local function createLine(p)
-    local l = Instance.new("Frame", p); l.BorderSizePixel = 0; l.ZIndex = 2; return l
-end
-
+-- --- ESP機能 (画像レイアウトを完全再現) ---
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
-    local esp = {
-        Main = container,
-        Lines = {},
-        Name = Instance.new("TextLabel", container),
-        Dist = Instance.new("TextLabel", container),
-        Ava = Instance.new("ImageLabel", container),
-        BarBG = Instance.new("Frame", container),
-        Bar = nil
-    }
-    for i=1,16 do esp.Lines[i] = createLine(container); if i <= 8 then esp.Lines[i].BackgroundColor3 = Color3.new(0,0,0); esp.Lines[i].ZIndex = 1 else esp.Lines[i].BackgroundColor3 = Color3.new(1,1,1) end end
-    local function style(t) t.BackgroundTransparency, t.TextColor3, t.Font, t.TextScaled = 1, Color3.new(1,1,1), Enum.Font.RobotoMono, true; Instance.new("UIStroke", t) end
-    style(esp.Name); style(esp.Dist)
-    esp.BarBG.BackgroundColor3 = Color3.new(0,0,0); esp.Bar = Instance.new("Frame", esp.BarBG); esp.Bar.BorderSizePixel = 0; esp.Bar.BackgroundColor3 = Color3.new(0,1,0)
-    esp.Ava.BackgroundTransparency = 1; Instance.new("UIStroke", esp.Ava)
-    return esp
+    local mainFrame = Instance.new("Frame", container); mainFrame.Size = UDim2.new(1, 0, 1, 0); mainFrame.BackgroundTransparency = 1; Instance.new("UIStroke", mainFrame).Color = Color3.new(1,1,1)
+    
+    local info = Instance.new("Frame", container); info.Size = UDim2.new(1, -10, 1, -10); info.Position = UDim2.new(0, 5, 0, 5); info.BackgroundTransparency = 1
+    
+    local name = Instance.new("TextLabel", info); name.Size = UDim2.new(1, 0, 0, 15); name.TextXAlignment = "Left"; name.TextColor3 = Color3.new(1,1,1)
+    local distText = Instance.new("TextLabel", info); distText.Size = UDim2.new(1, 0, 0, 12); distText.Position = UDim2.new(0,0,0,15); distText.TextXAlignment = "Left"; distText.TextColor3 = Color3.new(0.8,0.8,0.8)
+    local healthNum = Instance.new("TextLabel", info); healthNum.Size = UDim2.new(1, 0, 0, 15); healthNum.Position = UDim2.new(0,0,0,30); healthNum.TextXAlignment = "Left"; healthNum.TextColor3 = Color3.new(0,1,0)
+    
+    local ava = Instance.new("ImageLabel", info); ava.Size = UDim2.new(0, 35, 0, 35); ava.Position = UDim2.new(0, 0, 0, 48); ava.BackgroundTransparency = 1; Instance.new("UIStroke", ava)
+    
+    local barBG = Instance.new("Frame", info); barBG.Size = UDim2.new(1, 0, 0, 5); barBG.Position = UDim2.new(0, 0, 1, -5); barBG.BackgroundColor3 = Color3.new(0,0,0)
+    local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.BackgroundColor3 = Color3.new(0,1,0); bar.BorderSizePixel = 0
+
+    local function style(t) t.BackgroundTransparency, t.Font, t.TextScaled = 1, Enum.Font.RobotoMono, true; Instance.new("UIStroke", t).Thickness = 0.5 end
+    style(name); style(distText); style(healthNum)
+
+    return {Main = container, Name = name, Dist = distText, HealthNum = healthNum, Ava = ava, Bar = bar}
 end
 local pESP = {}
 
@@ -127,33 +108,23 @@ R.RenderStepped:Connect(function()
             local char = v.Character; local hum = char.Humanoid
             if hum.Health > 0 and (not v.Team or v.Team ~= LP.Team) then
                 if not pESP[v] then pESP[v] = createESP(v) end
-                local esp = pESP[v]
-                local headPos, onScreen = C:WorldToViewportPoint(char.Head.Position)
+                local esp = pESP[v]; local pos, onScreen = C:WorldToViewportPoint(char.Head.Position)
                 
                 if onScreen then
                     local dist = (char.Head.Position - C.CFrame.Position).Magnitude
-                    local hPos = C:WorldToViewportPoint(char.Head.Position + Vector3.new(0, 0.7, 0))
-                    local bPos = C:WorldToViewportPoint(char.HumanoidRootPart.Position - Vector3.new(0, 3, 0))
-                    local h = math.abs(hPos.Y - bPos.Y); local w = h * 0.6
-                    local x, y = headPos.X - w/2, headPos.Y - h/4
+                    local h = math.clamp(500/pos.Z * 20, 110, 300); local w = h * 0.85
                     
-                    esp.Main.Visible = true
-                    -- コーナーボックス描画
-                    local l = w*0.2; local t=1
-                    local function draw(i,px,py,sx,sy) local line=esp.Lines[i]; line.Position=UDim2.new(0,px,0,py); line.Size=UDim2.new(0,sx,0,sy) end
-                    draw(9,x,y,l,t); draw(10,x,y,t,l); draw(11,x+w-l,y,l,t); draw(12,x+w,y,t,l); draw(13,x,y+h,l,t); draw(14,x,y+h-l,t,l); draw(15,x+w-l,y+h,l,t); draw(16,x+w,y+h-l,t,l)
-                    for i=1,8 do local s=esp.Lines[i+8]; draw(i,s.Position.X.Offset-1, s.Position.Y.Offset-1, s.Size.X.Offset+2, s.Size.Y.Offset+2) end
-                    
-                    esp.Name.Text = v.DisplayName; esp.Name.Position = UDim2.new(0, x, 0, y-20); esp.Name.Size = UDim2.new(0, w, 0, 15)
-                    esp.Dist.Text = math.floor(dist).."m"; esp.Dist.Position = UDim2.new(0, x, 0, y+h+5); esp.Dist.Size = UDim2.new(0, w, 0, 12)
-                    esp.BarBG.Position = UDim2.new(0, x-6, 0, y); esp.BarBG.Size = UDim2.new(0, 3, 0, h)
-                    esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
-                    esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"; esp.Ava.Position = UDim2.new(0, x+w+5, 0, y); esp.Ava.Size = UDim2.new(0, 30, 0, 30)
+                    esp.Main.Visible = true; esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/3); esp.Main.Size = UDim2.new(0, w, 0, h)
+                    esp.Name.Text = "Name: "..v.DisplayName
+                    esp.Dist.Text = "Dist: "..math.floor(dist).."m"
+                    esp.HealthNum.Text = "Health: "..math.floor(hum.Health)
+                    esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
+                    esp.Bar.Size = UDim2.new(hum.Health/hum.MaxHealth, 0, 1, 0)
+                    esp.Bar.BackgroundColor3 = (hum.Health > 50) and Color3.new(0,1,0) or Color3.new(1,0,0)
 
-                    -- エイム判定
                     local isVisible = #C:GetPartsObscuringTarget({char.Head.Position}, {char, LP.Character}) == 0
                     if (not config.wallCheck) or isVisible then
-                        local dC = (Vector2.new(headPos.X, headPos.Y) - center).Magnitude
+                        local dC = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                         if dC < nearest then target = char.Head; nearest = dC end
                     end
                 else esp.Main.Visible = false end
