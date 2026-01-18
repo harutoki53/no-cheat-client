@@ -1,4 +1,4 @@
--- Rivals Script: Final God Mode Hybrid (Menu System + Mode Sync)
+-- Rivals Script: Ultimate Hybrid Edition (Harutoki Custom)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -8,57 +8,57 @@ local config = {
     aimbot = true,
     autoFire = true,
     wallCheck = true,
-    isPC = true,      -- モード切替
+    isPC = true,
     smooth = 0.4,
-    fov = 150,        -- スマホ用FOV
-    pcFov = 800,      -- PC用FOV
+    fov = 150,        -- スマホ用初期値
+    pcFov = 800,      -- PC用固定値
     maxDistance = 500,
     menuOpen = false
 }
 
--- UIの親を取得
-local ParentGui = (gethui and gethui()) or game:GetService("CoreGui") or LP:WaitForChild("PlayerGui")
-local gui = Instance.new("ScreenGui", ParentGui)
-gui.Name = "HarutokiGodSystem"
+-- 既存のGUIを削除
+local old = LP:WaitForChild("PlayerGui"):FindFirstChild("HarutokiUltimate")
+if old then old:Destroy() end
+
+local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+gui.Name = "HarutokiUltimate"
 gui.IgnoreGuiInset = true
 
--- --- FOV円 (スマホ用) ---
+-- --- FOV円 (スマホのみ) ---
 local fovCircle = Instance.new("Frame", gui)
 fovCircle.BackgroundColor3 = Color3.new(1, 1, 1); fovCircle.BackgroundTransparency = 0.9
 fovCircle.AnchorPoint = Vector2.new(0.5, 0.5); fovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
 Instance.new("UICorner", fovCircle).CornerRadius = UDim.new(1, 0)
 local fovStroke = Instance.new("UIStroke", fovCircle); fovStroke.Color = Color3.new(1, 1, 1)
 
--- --- 設定ウィンドウ ---
+-- --- 設定メニュー ---
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 280); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -140)
-menuFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05); menuFrame.Visible = false
-Instance.new("UICorner", menuFrame)
-Instance.new("UIStroke", menuFrame).Color = Color3.new(1, 1, 1)
+menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.BackgroundTransparency = 0.1; menuFrame.Visible = false
+Instance.new("UICorner", menuFrame); Instance.new("UIStroke", menuFrame).Color = Color3.new(1, 1, 1)
 
 local title = Instance.new("TextLabel", menuFrame)
 title.Size = UDim2.new(1, 0, 0, 40); title.Text = "HARUTOKI SETTINGS"; title.TextColor3 = Color3.new(1, 1, 1)
 title.BackgroundTransparency = 1; title.TextScaled = true; title.Font = Enum.Font.RobotoMono
 
--- --- 常時表示ボタン (PC/スマホ切替) ---
+-- --- 常時表示: PC/スマホ切替 ---
 local modeToggle = Instance.new("TextButton", gui)
 modeToggle.Size = UDim2.new(0, 160, 0, 35); modeToggle.Position = UDim2.new(0, 10, 0, 10)
 modeToggle.BackgroundColor3 = Color3.new(0, 0, 0); modeToggle.BackgroundTransparency = 0.5
 modeToggle.TextColor3 = Color3.new(1, 1, 1); modeToggle.TextScaled = true; modeToggle.Font = Enum.Font.RobotoMono
 Instance.new("UIStroke", modeToggle)
 
--- --- スマホ用メニュー表示ボタン ---
+-- --- スマホ用メニューボタン ---
 local mobileMenuBtn = Instance.new("TextButton", gui)
 mobileMenuBtn.Size = UDim2.new(0, 100, 0, 35); mobileMenuBtn.Position = UDim2.new(0, 10, 0, 50)
-mobileMenuBtn.BackgroundColor3 = Color3.new(0, 0, 0); mobileMenuBtn.BackgroundTransparency = 0.5
-mobileMenuBtn.Text = "MENU"; mobileMenuBtn.TextColor3 = Color3.new(1, 1, 0); mobileMenuBtn.Visible = false
+mobileMenuBtn.Text = "MENU"; mobileMenuBtn.BackgroundColor3 = Color3.new(0, 0, 0); mobileMenuBtn.TextColor3 = Color3.new(1, 1, 0); mobileMenuBtn.Visible = false
 Instance.new("UIStroke", mobileMenuBtn)
 
--- --- メニュー内パーツ作成 ---
+-- --- メニュー内ボタン ---
 local function createMenuBtn(txt, y)
     local b = Instance.new("TextButton", menuFrame)
     b.Size = UDim2.new(0.9, 0, 0, 35); b.Position = UDim2.new(0.05, 0, 0, y)
-    b.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15); b.TextColor3 = Color3.new(1, 1, 1)
+    b.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2); b.TextColor3 = Color3.new(1, 1, 1)
     b.Text = txt; b.TextScaled = true; b.Font = Enum.Font.RobotoMono
     Instance.new("UICorner", b); return b
 end
@@ -66,14 +66,16 @@ end
 local aimBtn = createMenuBtn("AIMBOT", 50)
 local fireBtn = createMenuBtn("AUTO FIRE", 95)
 local wallBtn = createMenuBtn("FILTER", 140)
-local fovBtn = createMenuBtn("MOBILE FOV", 185)
-local closeBtn = createMenuBtn("CLOSE", 230); closeBtn.BackgroundColor3 = Color3.new(0.3, 0.1, 0.1)
+local fovBtn = createMenuBtn("MOBILE FOV", 185) -- PCでは消す
+local closeBtn = createMenuBtn("CLOSE", 230); closeBtn.BackgroundColor3 = Color3.new(0.4, 0.1, 0.1)
 
 local function updateUI()
     modeToggle.Text = "MODE: " .. (config.isPC and "PC" or "MOBILE")
     mobileMenuBtn.Visible = not config.isPC
     menuFrame.Visible = config.menuOpen
     
+    -- PCならFOVボタンを隠す
+    fovBtn.Visible = not config.isPC
     fovCircle.Visible = (not config.isPC and config.aimbot)
     fovCircle.Size = UDim2.new(0, config.fov * 2, 0, config.fov * 2)
     
@@ -97,62 +99,80 @@ fovBtn.MouseButton1Click:Connect(function() config.fov = (config.fov >= 450) and
 
 U.InputBegan:Connect(function(input, gpe)
     if gpe then return end
-    if input.KeyCode == Enum.KeyCode.RightShift and config.isPC then
-        config.menuOpen = not config.menuOpen; updateUI()
+    if input.KeyCode == Enum.KeyCode.RightShift and config.isPC then config.menuOpen = not config.menuOpen; updateUI()
     elseif input.KeyCode == Enum.KeyCode.K then config.aimbot = not config.aimbot; updateUI()
     elseif input.KeyCode == Enum.KeyCode.L then config.autoFire = not config.autoFire; updateUI()
     elseif input.KeyCode == Enum.KeyCode.J then config.wallCheck = not config.wallCheck; updateUI() end
 end)
 
--- --- エイム & メインループ (ご提示のコードを最適化して統合) ---
+-- --- ESP描写関数 ---
+local function createESP(v)
+    local f = Instance.new("Frame", gui); f.BackgroundTransparency = 1; f.Visible = false
+    local esp = {
+        Main = f,
+        Name = Instance.new("TextLabel", f),
+        HealthBarBG = Instance.new("Frame", f),
+        HealthBar = Instance.new("Frame", f),
+        Distance = Instance.new("TextLabel", f)
+    }
+    local function style(l) l.BackgroundTransparency, l.TextColor3, l.TextScaled, l.Font = 1, Color3.new(1,1,1), true, Enum.Font.RobotoMono; Instance.new("UIStroke", l) end
+    style(esp.Name); style(esp.Distance); esp.HealthBarBG.BackgroundColor3 = Color3.new(0,0,0)
+    esp.HealthBar.BorderSizePixel = 0; esp.HealthBar.Parent = esp.HealthBarBG
+    return esp
+end
+local pESP = {}
+
+-- --- メインループ ---
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
-    if not C or not config.aimbot then return end
-    
+    if not C then return end
     local mousePos = U:GetMouseLocation()
     local center = Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2)
     local target, nearest = nil, (config.isPC and config.pcFov or config.fov)
 
     for _, v in pairs(P:GetPlayers()) do
         local char = v.Character
-        if v ~= LP and char and char:FindFirstChild("Head") and char:FindFirstChildOfClass("Humanoid") and char.Humanoid.Health > 0 then
-            if not v.Team or v.Team ~= LP.Team then
-                local pos, onScreen = C:WorldToViewportPoint(char.Head.Position)
-                if onScreen then
-                    local isVisible = #C:GetPartsObscuringTarget({char.Head.Position}, {char, LP.Character}) == 0
-                    
-                    -- フィルター設定に応じたエイム条件
-                    if (not config.wallCheck) or isVisible then
-                        local distCenter = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                        if distCenter < nearest then
-                            target = char.Head
-                            nearest = distCenter
-                        end
-                    end
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local head = char and char:FindFirstChild("Head")
+
+        if v ~= LP and hum and root and head and hum.Health > 0 then
+            if not pESP[v] then pESP[v] = createESP(v) end
+            local esp = pESP[v]
+            local pos, onScreen = C:WorldToViewportPoint(head.Position)
+
+            if onScreen then
+                local dist = (root.Position - C.CFrame.Position).Magnitude
+                local isVisible = #C:GetPartsObscuringTarget({head.Position}, {char, LP.Character}) == 0
+                
+                -- ESP表示
+                esp.Main.Visible = true
+                esp.Name.Text = v.DisplayName; esp.Name.Position = UDim2.new(0, pos.X-50, 0, pos.Y-40); esp.Name.Size = UDim2.new(0, 100, 0, 15)
+                esp.Distance.Text = math.floor(dist).."m"; esp.Distance.Position = UDim2.new(0, pos.X-50, 0, pos.Y+20); esp.Distance.Size = UDim2.new(0, 100, 0, 12)
+                esp.HealthBarBG.Position = UDim2.new(0, pos.X-25, 0, pos.Y-20); esp.HealthBarBG.Size = UDim2.new(0, 50, 0, 3)
+                esp.HealthBar.Size = UDim2.new(hum.Health/hum.MaxHealth, 0, 1, 0); esp.HealthBar.BackgroundColor3 = (hum.Health/hum.MaxHealth > 0.5) and Color3.new(0,1,0) or Color3.new(1,0,0)
+
+                -- エイム判定 (FILTER連動)
+                if (not config.wallCheck) or isVisible then
+                    local distCenter = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if distCenter < nearest then target = head; nearest = distCenter end
                 end
-            end
-        end
+            else esp.Main.Visible = false end
+        elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    if target then
-        -- PCなら右クリック、スマホなら自動
-        local isAiming = config.isPC and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or not config.isPC
-        
-        if isAiming then
+    -- 実行
+    if target and config.aimbot then
+        local isAim = config.isPC and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or not config.isPC
+        if isAim then
             local pos = C:WorldToViewportPoint(target.Position)
-            local offset = (Vector2.new(pos.X, pos.Y) - mousePos)
-
             if config.isPC and mousemoverel then
-                mousemoverel(offset.X * config.smooth, offset.Y * config.smooth)
+                mousemoverel((pos.X - mousePos.X) * config.smooth, (pos.Y - mousePos.Y) * config.smooth)
             else
                 C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, target.Position), config.smooth * 0.4)
             end
-
-            if config.autoFire and mouse1press then
-                mouse1press(); task.wait(0.01); mouse1release()
-            end
+            if config.autoFire and mouse1press then mouse1press(); task.wait(0.01); mouse1release() end
         end
     end
 end)
-
 updateUI()
