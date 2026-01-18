@@ -1,4 +1,4 @@
--- Rivals Script: Final Balanced Version (K/J Toggle + Status)
+-- Rivals Script: Final Balanced Version (Visibility & Distance Filter)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -6,10 +6,11 @@ local LP = P.LocalPlayer
 
 local config = {
     aimbot = true,
-    wallCheck = true,
+    wallCheck = true, -- ONの間は壁裏・遠距離を非表示
     smooth = 0.1,
     fov = 150,
-    maxSize = 400
+    maxSize = 400,
+    maxDistance = 500 -- 遠すぎる敵を隠す距離
 }
 
 -- UIの親を確実に取得
@@ -40,12 +41,12 @@ local wallLabel = createLabel("WallStatus", UDim2.new(0, 10, 0, 40), Color3.new(
 local function updateStatus()
     aimLabel.Text = "AIMBOT: " .. (config.aimbot and "ON [K]" or "OFF [K]")
     aimLabel.TextColor3 = config.aimbot and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-    wallLabel.Text = "WALL CHECK: " .. (config.wallCheck and "ON [J]" or "OFF [J]")
+    wallLabel.Text = "FILTER: " .. (config.wallCheck and "ON [J]" or "OFF [J]")
     wallLabel.TextColor3 = config.wallCheck and Color3.new(0, 1, 1) or Color3.new(1, 0.5, 0)
 end
 updateStatus()
 
--- --- キー入力判定（ここでKとJを制御） ---
+-- --- キー入力判定 ---
 U.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.K then
@@ -138,39 +139,53 @@ R.RenderStepped:Connect(function()
             local pos, onScreen = C:WorldToViewportPoint(root.Position)
             
             if onScreen then
-                local hPos = C:WorldToViewportPoint(head.Position + Vector3.new(0, 0.7, 0))
-                local lPos = C:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-                local h = math.clamp(math.abs(hPos.Y - lPos.Y), 40, config.maxSize)
-                local w = h * 0.6
-                local x, y = pos.X - w/2, pos.Y - h/2
-                
-                esp.Main.Visible = true
-                updateCornerBox(esp.Corners, x, y, w, h)
-                
-                local p = hum.Health / hum.MaxHealth
-                esp.HealthNum.Text = tostring(math.floor(hum.Health))
-                esp.HealthNum.Position, esp.HealthNum.Size = UDim2.new(0, x - 40, 0, y - 18), UDim2.new(0, 35, 0, 15)
-                esp.BarBG.Position, esp.BarBG.Size = UDim2.new(0, x - 8, 0, y), UDim2.new(0, 4, 0, h)
-                esp.Bar.Size = UDim2.new(1, 0, p, 0)
-                esp.Bar.BackgroundColor3 = p > 0.5 and Color3.new(0,1,0) or Color3.new(1,0,0)
-                
-                esp.Name.Text = v.DisplayName
-                esp.Name.Position, esp.Name.Size = UDim2.new(0, x, 0, y - 20), UDim2.new(0, w, 0, 18)
-                esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
-                esp.Ava.Position, esp.Ava.Size = UDim2.new(0, x + w + 5, 0, y), UDim2.new(0, h*0.3, 0, h*0.3)
-                
-                -- 壁チェック判定の修正
-                local isVisible = true
+                -- 距離と壁のチェック
+                local distToPlayer = (root.Position - C.CFrame.Position).Magnitude
+                local parts = C:GetPartsObscuringTarget({head.Position}, {char, LP.Character})
+                local isVisible = (#parts == 0)
+
+                -- フィルター条件の適用
+                local shouldShow = true
                 if config.wallCheck then
-                    local parts = C:GetPartsObscuringTarget({head.Position}, {char, LP.Character})
-                    if #parts > 0 then isVisible = false end
+                    -- JがONの時：壁の裏、または遠すぎる敵は表示しない
+                    if not isVisible or distToPlayer > config.maxDistance then
+                        shouldShow = false
+                    end
                 end
 
-                if isVisible then
-                    local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                    if dist < nearest then target, nearest = v, dist end
+                if shouldShow then
+                    local hPos = C:WorldToViewportPoint(head.Position + Vector3.new(0, 0.7, 0))
+                    local lPos = C:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+                    local h = math.clamp(math.abs(hPos.Y - lPos.Y), 40, config.maxSize)
+                    local w = h * 0.6
+                    local x, y = pos.X - w/2, pos.Y - h/2
+                    
+                    esp.Main.Visible = true
+                    updateCornerBox(esp.Corners, x, y, w, h)
+                    
+                    local p = hum.Health / hum.MaxHealth
+                    esp.HealthNum.Text = tostring(math.floor(hum.Health))
+                    esp.HealthNum.Position, esp.HealthNum.Size = UDim2.new(0, x - 40, 0, y - 18), UDim2.new(0, 35, 0, 15)
+                    esp.BarBG.Position, esp.BarBG.Size = UDim2.new(0, x - 8, 0, y), UDim2.new(0, 4, 0, h)
+                    esp.Bar.Size = UDim2.new(1, 0, p, 0)
+                    esp.Bar.BackgroundColor3 = p > 0.5 and Color3.new(0,1,0) or Color3.new(1,0,0)
+                    
+                    esp.Name.Text = v.DisplayName
+                    esp.Name.Position, esp.Name.Size = UDim2.new(0, x, 0, y - 20), UDim2.new(0, w, 0, 18)
+                    esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
+                    esp.Ava.Position, esp.Ava.Size = UDim2.new(0, x + w + 5, 0, y), UDim2.new(0, h*0.3, 0, h*0.3)
+                    
+                    -- エイムターゲットの選定（見える敵のみ）
+                    if isVisible then
+                        local distMouse = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                        if distMouse < nearest then target, nearest = v, distMouse end
+                    end
+                else
+                    esp.Main.Visible = false
                 end
-            else esp.Main.Visible = false end
+            else
+                esp.Main.Visible = false
+            end
         elseif playerESP[v] then
             playerESP[v].Main.Visible = false
         end
