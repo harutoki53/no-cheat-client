@@ -1,23 +1,22 @@
--- Rivals Script: Final Polished Version
+-- Rivals Script: Final Polished Version (Match-Only)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
 local LP = P.LocalPlayer
-local C = workspace.CurrentCamera
 
 local config = {
     aimbot = true,
     wallCheck = true,
     smooth = 0.12,
     fov = 150,
-    maxSize = 420 -- 至近距離での巨大化防止
+    maxSize = 420 -- 至近距離でのキモい巨大化を防止
 }
 
 local ParentGui = (gethui and gethui()) or game:GetService("CoreGui")
 local gui = Instance.new("ScreenGui", ParentGui)
 gui.Name = "HarutokiUltimateESP"
 
--- コーナーボックス作成（二重構造）
+-- コーナーボックス作成（動画のような二重線構造）
 local function createCornerBox(parent)
     local lines = {}
     for i = 1, 16 do
@@ -81,6 +80,7 @@ local function getHealthColor(p)
     else return Color3.new(1, 0, 0) end
 end
 
+-- 試合中の敵のみを判別
 local function isTarget(v)
     if v == LP or not v.Team or v.Team == LP.Team then return false end
     local lobby = game:GetService("Teams"):FindFirstChild("Lobby")
@@ -88,7 +88,7 @@ local function isTarget(v)
 end
 
 R.RenderStepped:Connect(function()
-    C = workspace.CurrentCamera
+    local C = workspace.CurrentCamera
     if not C then return end
     local mousePos = U:GetMouseLocation()
     local target, nearest = nil, config.fov
@@ -130,6 +130,7 @@ R.RenderStepped:Connect(function()
                 esp.Info.Text = (st > 0) and "Lv."..lv.."\n"..st.." STREAK" or "Lv."..lv
                 esp.Info.Position, esp.Info.Size = UDim2.new(0, x + w + 5, 0, y + h*0.3 + 5), UDim2.new(0, 60, 0, 25)
 
+                -- Aimbotのターゲット選定（壁チェックあり）
                 if not config.wallCheck or #C:GetPartsObscuringTarget({head.Position}, {LP.Character, char}) == 0 then
                     local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
                     if dist < nearest then target, nearest = v, dist end
@@ -138,6 +139,7 @@ R.RenderStepped:Connect(function()
         elseif playerESP[v] then playerESP[v].Main.Visible = false end
     end
 
+    -- オートエイム実行 (右クリック長押し)
     if target and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local head = target.Character:FindFirstChild("Head")
         if head then
