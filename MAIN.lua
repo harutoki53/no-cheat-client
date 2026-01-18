@@ -1,4 +1,4 @@
--- Rivals Script: Fixed Version
+-- Rivals Script: Final Balanced Version (K/J Toggle + Status)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -15,9 +15,47 @@ local config = {
 -- UIの親を確実に取得
 local ParentGui = (gethui and gethui()) or game:GetService("CoreGui") or LP:WaitForChild("PlayerGui")
 local gui = Instance.new("ScreenGui")
-gui.Name = "HarutokiUltimate"
+gui.Name = "HarutokiFinal"
 gui.IgnoreGuiInset = true
 gui.Parent = ParentGui
+
+-- --- ステータス表示（左上） ---
+local function createLabel(name, pos, color)
+    local l = Instance.new("TextLabel", gui)
+    l.Name = name
+    l.Size = UDim2.new(0, 180, 0, 25)
+    l.Position = pos
+    l.BackgroundColor3 = Color3.new(0, 0, 0)
+    l.BackgroundTransparency = 0.5
+    l.TextColor3 = color
+    l.TextScaled = true
+    l.Font = Enum.Font.RobotoMono
+    Instance.new("UIStroke", l).Thickness = 1
+    return l
+end
+
+local aimLabel = createLabel("AimStatus", UDim2.new(0, 10, 0, 10), Color3.new(0, 1, 0))
+local wallLabel = createLabel("WallStatus", UDim2.new(0, 10, 0, 40), Color3.new(0, 1, 1))
+
+local function updateStatus()
+    aimLabel.Text = "AIMBOT: " .. (config.aimbot and "ON [K]" or "OFF [K]")
+    aimLabel.TextColor3 = config.aimbot and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+    wallLabel.Text = "WALL CHECK: " .. (config.wallCheck and "ON [J]" or "OFF [J]")
+    wallLabel.TextColor3 = config.wallCheck and Color3.new(0, 1, 1) or Color3.new(1, 0.5, 0)
+end
+updateStatus()
+
+-- --- キー入力判定（ここでKとJを制御） ---
+U.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.K then
+        config.aimbot = not config.aimbot
+        updateStatus()
+    elseif input.KeyCode == Enum.KeyCode.J then
+        config.wallCheck = not config.wallCheck
+        updateStatus()
+    end
+end)
 
 -- コーナー作成
 local function createCornerBox(parent)
@@ -73,12 +111,10 @@ end
 
 local playerESP = {}
 
--- 試合中の敵判定（ロビー以外）
 local function isTarget(v)
     if v == LP then return false end
     local char = v.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
-    -- Rivalsのチーム判定
     if v.Team and LP.Team and v.Team == LP.Team then return false end
     if v.Team and v.Team.Name == "Lobby" then return false end
     return true
@@ -123,7 +159,14 @@ R.RenderStepped:Connect(function()
                 esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
                 esp.Ava.Position, esp.Ava.Size = UDim2.new(0, x + w + 5, 0, y), UDim2.new(0, h*0.3, 0, h*0.3)
                 
-                if not config.wallCheck or #C:GetPartsObscuringTarget({head.Position}, {char}) == 0 then
+                -- 壁チェック判定の修正
+                local isVisible = true
+                if config.wallCheck then
+                    local parts = C:GetPartsObscuringTarget({head.Position}, {char, LP.Character})
+                    if #parts > 0 then isVisible = false end
+                end
+
+                if isVisible then
                     local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
                     if dist < nearest then target, nearest = v, dist end
                 end
@@ -133,7 +176,6 @@ R.RenderStepped:Connect(function()
         end
     end
 
-    -- オートエイム (右クリック)
     if target and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local head = target.Character:FindFirstChild("Head")
         if head then
@@ -143,7 +185,6 @@ R.RenderStepped:Connect(function()
             if mousemoverel then
                 mousemoverel(move.X, move.Y)
             else
-                -- 予備のエイム方式
                 C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, head.Position), config.smooth)
             end
         end
