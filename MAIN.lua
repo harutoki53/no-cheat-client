@@ -4,14 +4,14 @@ local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
 local LP = P.LocalPlayer
 
--- カメラを確実に見つけるためのループ
+-- カメラを確実に見つけるための待機ループ
 local C = workspace.CurrentCamera
 while not C do
     task.wait()
     C = workspace.CurrentCamera
 end
 
--- UIの親設定
+-- UIの親設定（Executor用）
 local ParentGui = (gethui and gethui()) or game:GetService("CoreGui")
 local gui = Instance.new("ScreenGui", ParentGui)
 gui.Name = "HarutokiFinal"
@@ -35,10 +35,15 @@ HealthNum.Size, HealthNum.Position = UDim2.new(0.2,0,0.1,0), UDim2.new(0.05,0,0,
 HealthNum.BackgroundTransparency, HealthNum.TextColor3, HealthNum.TextScaled = 1, Color3.new(1,1,1), true
 HealthNum.Text = "100"
 
+-- 体力バー（背景）
 local HB_BG = Instance.new("Frame", F)
 HB_BG.Size, HB_BG.Position, HB_BG.BackgroundColor3 = UDim2.new(0,12,0.8,0), UDim2.new(0.05,0,0.1,0), Color3.fromRGB(30,30,30)
+
+-- 体力バー（中身：上から下に減るようにAnchorPointを調整）
 local Bar = Instance.new("Frame", HB_BG)
-Bar.Size, Bar.AnchorPoint, Bar.Position = UDim2.new(1,0,1,0), Vector2.new(0,0), UDim2.new(0,0,0,0) -- 上から下に減る
+Bar.Size = UDim2.new(1,0,1,0)
+Bar.AnchorPoint = Vector2.new(0, 0)
+Bar.Position = UDim2.new(0, 0, 0, 0)
 
 local Name = Instance.new("TextLabel", F)
 Name.Size, Name.Position, Name.BackgroundTransparency, Name.TextColor3, Name.TextScaled = UDim2.new(0.7,0,0.2,0), UDim2.new(0.25,0,0.05,0), 1, Color3.new(1,1,1), true
@@ -58,10 +63,10 @@ Ic.Size, Ic.Position, Ic.BackgroundTransparency = UDim2.new(0,40,0,40), UDim2.ne
 
 -- --- 体力の色判定ロジック ---
 local function getHealthColor(p)
-    if p >= 80 then return Color3.new(0, 1, 0) -- 緑
-    elseif p >= 50 then return Color3.new(1, 1, 0) -- 黄
-    elseif p >= 25 then return Color3.fromRGB(255, 165, 0) -- オレンジ
-    else return Color3.new(1, 0, 0) -- 赤
+    if p >= 80 then return Color3.new(0, 1, 0)      -- 80~100: 緑
+    elseif p >= 50 then return Color3.new(1, 1, 0)  -- 50~80: 黄色
+    elseif p >= 25 then return Color3.fromRGB(255, 165, 0) -- 25~50: オレンジ
+    else return Color3.new(1, 0, 0)                 -- 0~25: 赤
     end
 end
 
@@ -74,7 +79,7 @@ end
 
 -- --- メイン処理 ---
 R.RenderStepped:Connect(function()
-    C = workspace.CurrentCamera -- カメラを毎フレーム再取得（nilエラー対策）
+    C = workspace.CurrentCamera -- 毎フレーム再取得してnilエラーを防止
     if not C then return end
 
     local target, nearest = nil, config.fov
@@ -103,10 +108,10 @@ R.RenderStepped:Connect(function()
         local p = math.clamp(hum.Health/hum.MaxHealth, 0, 1)
         
         F.Visible = true
-        HealthNum.Text = tostring(hp)
+        HealthNum.Text = tostring(hp) -- 数値で表示
         Name.Text = target.DisplayName or target.Name
-        Bar.Size = UDim2.new(1, 0, p, 0) -- 上から下に減るバー
-        Bar.BackgroundColor3 = getHealthColor(p * 100)
+        Bar.Size = UDim2.new(1, 0, p, 0) -- 体力バーは上から下に減る
+        Bar.BackgroundColor3 = getHealthColor(p * 100) -- 色変化
         Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..target.UserId.."&w=150&h=150"
         
         -- レベル・連勝表示
@@ -133,8 +138,8 @@ end)
 U.InputBegan:Connect(function(i, g)
     if g then return end
     if i.KeyCode == Enum.KeyCode.K then
-        config.aimbot = not config.aimbot
+        config.aimbot = not config.aimbot -- Kキーでオートエイム切替
     elseif i.KeyCode == Enum.KeyCode.J then
-        config.wallCheck = not config.wallCheck
+        config.wallCheck = not config.wallCheck -- Jキーで壁越し判定切替
     end
 end)
