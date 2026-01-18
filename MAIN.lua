@@ -1,4 +1,4 @@
--- Rivals Script: Final Balanced Version (Visibility & Distance Filter)
+-- Rivals Script: Final God Mode (Auto Fire + Visibility Filter + Mobile Support)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -6,8 +6,9 @@ local LP = P.LocalPlayer
 
 local config = {
     aimbot = true,
-    wallCheck = true, -- ONの間は壁裏・遠距離を非表示
-    smooth = 0.1,
+    autoFire = true,  -- 自動発射
+    wallCheck = true, -- ONの間は壁裏・天井裏・遠距離を非表示
+    smooth = 0.12,
     fov = 150,
     maxSize = 400,
     maxDistance = 500 -- 遠すぎる敵を隠す距離
@@ -16,64 +17,65 @@ local config = {
 -- UIの親を確実に取得
 local ParentGui = (gethui and gethui()) or game:GetService("CoreGui") or LP:WaitForChild("PlayerGui")
 local gui = Instance.new("ScreenGui")
-gui.Name = "HarutokiFinal"
+gui.Name = "HarutokiGodMode"
 gui.IgnoreGuiInset = true
 gui.Parent = ParentGui
 
--- --- ステータス表示（左上） ---
-local function createLabel(name, pos, color)
-    local l = Instance.new("TextLabel", gui)
-    l.Name = name
-    l.Size = UDim2.new(0, 180, 0, 25)
-    l.Position = pos
-    l.BackgroundColor3 = Color3.new(0, 0, 0)
-    l.BackgroundTransparency = 0.5
-    l.TextColor3 = color
-    l.TextScaled = true
-    l.Font = Enum.Font.RobotoMono
-    Instance.new("UIStroke", l).Thickness = 1
-    return l
+-- --- ステータス表示（タップ可能なボタン形式） ---
+local function createButton(name, pos, color)
+    local b = Instance.new("TextButton", gui)
+    b.Name = name
+    b.Size = UDim2.new(0, 180, 0, 30)
+    b.Position = pos
+    b.BackgroundColor3 = Color3.new(0, 0, 0)
+    b.BackgroundTransparency = 0.5
+    b.TextColor3 = color
+    b.TextScaled = true
+    b.Font = Enum.Font.RobotoMono
+    b.AutoButtonColor = true
+    Instance.new("UIStroke", b).Thickness = 1
+    return b
 end
 
-local aimLabel = createLabel("AimStatus", UDim2.new(0, 10, 0, 10), Color3.new(0, 1, 0))
-local wallLabel = createLabel("WallStatus", UDim2.new(0, 10, 0, 40), Color3.new(0, 1, 1))
+local aimBtn = createButton("AimBtn", UDim2.new(0, 10, 0, 10), Color3.new(0, 1, 0))
+local fireBtn = createButton("FireBtn", UDim2.new(0, 10, 0, 45), Color3.new(1, 0.8, 0))
+local wallBtn = createButton("WallBtn", UDim2.new(0, 10, 0, 80), Color3.new(0, 1, 1))
 
 local function updateStatus()
-    aimLabel.Text = "AIMBOT: " .. (config.aimbot and "ON [K]" or "OFF [K]")
-    aimLabel.TextColor3 = config.aimbot and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-    wallLabel.Text = "FILTER: " .. (config.wallCheck and "ON [J]" or "OFF [J]")
-    wallLabel.TextColor3 = config.wallCheck and Color3.new(0, 1, 1) or Color3.new(1, 0.5, 0)
+    aimBtn.Text = "AIMBOT: " .. (config.aimbot and "ON [K]" or "OFF [K]")
+    aimBtn.TextColor3 = config.aimbot and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+    fireBtn.Text = "AUTO FIRE: " .. (config.autoFire and "ON [L]" or "OFF [L]")
+    fireBtn.TextColor3 = config.autoFire and Color3.new(1, 0.8, 0) or Color3.new(1, 0, 0)
+    wallBtn.Text = "FILTER: " .. (config.wallCheck and "ON [J]" or "OFF [J]")
+    wallBtn.TextColor3 = config.wallCheck and Color3.new(0, 1, 1) or Color3.new(1, 0.5, 0)
 end
 updateStatus()
 
--- --- キー入力判定 ---
+-- ボタン・キー入力判定
+aimBtn.MouseButton1Click:Connect(function() config.aimbot = not config.aimbot; updateStatus() end)
+fireBtn.MouseButton1Click:Connect(function() config.autoFire = not config.autoFire; updateStatus() end)
+wallBtn.MouseButton1Click:Connect(function() config.wallCheck = not config.wallCheck; updateStatus() end)
+
 U.InputBegan:Connect(function(input, gpe)
     if gpe then return end
-    if input.KeyCode == Enum.KeyCode.K then
-        config.aimbot = not config.aimbot
-        updateStatus()
-    elseif input.KeyCode == Enum.KeyCode.J then
-        config.wallCheck = not config.wallCheck
-        updateStatus()
-    end
+    if input.KeyCode == Enum.KeyCode.K then config.aimbot = not config.aimbot; updateStatus()
+    elseif input.KeyCode == Enum.KeyCode.L then config.autoFire = not config.autoFire; updateStatus()
+    elseif input.KeyCode == Enum.KeyCode.J then config.wallCheck = not config.wallCheck; updateStatus() end
 end)
 
--- コーナー作成
+-- コーナーESP作成
 local function createCornerBox(parent)
     local lines = {}
     for i = 1, 16 do
         local line = Instance.new("Frame", parent)
         line.BackgroundColor3 = (i <= 8) and Color3.new(0, 0, 0) or Color3.new(1, 1, 1)
-        line.BorderSizePixel = 0
-        line.ZIndex = (i <= 8) and 1 or 2
-        lines[i] = line
+        line.BorderSizePixel = 0; line.ZIndex = (i <= 8) and 1 or 2; lines[i] = line
     end
     return lines
 end
 
 local function updateCornerBox(lines, x, y, w, h)
-    local t, l = 1.5, w * 0.25
-    local ot = t + 2
+    local t, l = 1.5, w * 0.25; local ot = t + 2
     local function setPosSize(i, px, py, sx, sy)
         if not lines[i] or not lines[i+8] then return end
         lines[i].Position, lines[i].Size = UDim2.new(0, px, 0, py), UDim2.new(0, sx, 0, sy)
@@ -86,24 +88,19 @@ local function updateCornerBox(lines, x, y, w, h)
 end
 
 local function createESP(player)
-    local f = Instance.new("Frame", gui)
-    f.BackgroundTransparency = 1
-    f.Visible = false
+    local f = Instance.new("Frame", gui); f.BackgroundTransparency = 1; f.Visible = false
     local esp = {
         Main = f, Corners = createCornerBox(f),
         HealthNum = Instance.new("TextLabel", f),
         BarBG = Instance.new("Frame", f), Bar = nil,
         Name = Instance.new("TextLabel", f),
-        Ava = Instance.new("ImageLabel", f),
-        Info = Instance.new("TextLabel", f)
+        Ava = Instance.new("ImageLabel", f)
     }
     local function style(l)
         l.BackgroundTransparency, l.TextColor3, l.TextScaled = 1, Color3.new(1,1,1), true
-        l.Font = Enum.Font.RobotoMono
-        local s = Instance.new("UIStroke", l)
-        s.Thickness = 1
+        l.Font = Enum.Font.RobotoMono; Instance.new("UIStroke", l).Thickness = 1
     end
-    style(esp.HealthNum); style(esp.Name); style(esp.Info)
+    style(esp.HealthNum); style(esp.Name)
     esp.BarBG.BackgroundColor3 = Color3.new(0,0,0)
     esp.Bar = Instance.new("Frame", esp.BarBG); esp.Bar.BorderSizePixel = 0
     esp.Ava.BackgroundTransparency = 1; Instance.new("UIStroke", esp.Ava).Thickness = 1
@@ -117,10 +114,10 @@ local function isTarget(v)
     local char = v.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
     if v.Team and LP.Team and v.Team == LP.Team then return false end
-    if v.Team and v.Team.Name == "Lobby" then return false end
     return true
 end
 
+-- メインループ
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C then return end
@@ -139,18 +136,13 @@ R.RenderStepped:Connect(function()
             local pos, onScreen = C:WorldToViewportPoint(root.Position)
             
             if onScreen then
-                -- 距離と壁のチェック
                 local distToPlayer = (root.Position - C.CFrame.Position).Magnitude
                 local parts = C:GetPartsObscuringTarget({head.Position}, {char, LP.Character})
                 local isVisible = (#parts == 0)
 
-                -- フィルター条件の適用
                 local shouldShow = true
                 if config.wallCheck then
-                    -- JがONの時：壁の裏、または遠すぎる敵は表示しない
-                    if not isVisible or distToPlayer > config.maxDistance then
-                        shouldShow = false
-                    end
+                    if not isVisible or distToPlayer > config.maxDistance then shouldShow = false end
                 end
 
                 if shouldShow then
@@ -165,42 +157,38 @@ R.RenderStepped:Connect(function()
                     
                     local p = hum.Health / hum.MaxHealth
                     esp.HealthNum.Text = tostring(math.floor(hum.Health))
-                    esp.HealthNum.Position, esp.HealthNum.Size = UDim2.new(0, x - 40, 0, y - 18), UDim2.new(0, 35, 0, 15)
-                    esp.BarBG.Position, esp.BarBG.Size = UDim2.new(0, x - 8, 0, y), UDim2.new(0, 4, 0, h)
+                    esp.HealthNum.Position, esp.HealthNum.Size = UDim2.new(0, x-40, 0, y-18), UDim2.new(0, 35, 0, 15)
+                    esp.BarBG.Position, esp.BarBG.Size = UDim2.new(0, x-8, 0, y), UDim2.new(0, 4, 0, h)
                     esp.Bar.Size = UDim2.new(1, 0, p, 0)
                     esp.Bar.BackgroundColor3 = p > 0.5 and Color3.new(0,1,0) or Color3.new(1,0,0)
-                    
                     esp.Name.Text = v.DisplayName
-                    esp.Name.Position, esp.Name.Size = UDim2.new(0, x, 0, y - 20), UDim2.new(0, w, 0, 18)
+                    esp.Name.Position, esp.Name.Size = UDim2.new(0, x, 0, y-20), UDim2.new(0, w, 0, 18)
                     esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
-                    esp.Ava.Position, esp.Ava.Size = UDim2.new(0, x + w + 5, 0, y), UDim2.new(0, h*0.3, 0, h*0.3)
+                    esp.Ava.Position, esp.Ava.Size = UDim2.new(0, x+w+5, 0, y), UDim2.new(0, h*0.3, 0, h*0.3)
                     
-                    -- エイムターゲットの選定（見える敵のみ）
                     if isVisible then
                         local distMouse = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if distMouse < nearest then target, nearest = v, distMouse end
+                        if distMouse < nearest then target = v; nearest = distMouse end
                     end
-                else
-                    esp.Main.Visible = false
-                end
-            else
-                esp.Main.Visible = false
-            end
-        elseif playerESP[v] then
-            playerESP[v].Main.Visible = false
-        end
+                else esp.Main.Visible = false end
+            else esp.Main.Visible = false end
+        elseif playerESP[v] then playerESP[v].Main.Visible = false end
     end
 
+    -- エイム & 自動発射
     if target and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local head = target.Character:FindFirstChild("Head")
         if head then
-            local headPos = C:WorldToViewportPoint(head.Position)
-            local targetPos = Vector2.new(headPos.X, headPos.Y)
-            local move = (targetPos - mousePos) * config.smooth
-            if mousemoverel then
-                mousemoverel(move.X, move.Y)
-            else
-                C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, head.Position), config.smooth)
+            -- エイム移動
+            C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, head.Position), config.smooth)
+            
+            -- 自動発射（PC/実行環境用）
+            if config.autoFire then
+                if mouse1press then
+                    mouse1press()
+                    task.wait(0.05)
+                    mouse1release()
+                end
             end
         end
     end
