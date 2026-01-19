@@ -1,4 +1,4 @@
--- Rivals Script: Final God Mode (Auto Fire + Visibility Filter + Mobile Support)
+-- Rivals Script: Final God Mode (Enhanced Aim + Auto Fire + Filter)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -6,33 +6,27 @@ local LP = P.LocalPlayer
 
 local config = {
     aimbot = true,
-    autoFire = true,  -- 自動発射
-    wallCheck = true, -- ONの間は壁裏・天井裏・遠距離を非表示
-    smooth = 0.12,
+    autoFire = true,
+    wallCheck = true,
+    smooth = 0.4, -- マウス移動の滑らかさ (0.1〜1.0で調整)
     fov = 150,
     maxSize = 400,
-    maxDistance = 500 -- 遠すぎる敵を隠す距離
+    maxDistance = 500
 }
 
--- UIの親を確実に取得
+-- UIの親を取得
 local ParentGui = (gethui and gethui()) or game:GetService("CoreGui") or LP:WaitForChild("PlayerGui")
 local gui = Instance.new("ScreenGui")
 gui.Name = "HarutokiGodMode"
 gui.IgnoreGuiInset = true
 gui.Parent = ParentGui
 
--- --- ステータス表示（タップ可能なボタン形式） ---
+-- --- ステータスボタン ---
 local function createButton(name, pos, color)
     local b = Instance.new("TextButton", gui)
-    b.Name = name
-    b.Size = UDim2.new(0, 180, 0, 30)
-    b.Position = pos
-    b.BackgroundColor3 = Color3.new(0, 0, 0)
-    b.BackgroundTransparency = 0.5
-    b.TextColor3 = color
-    b.TextScaled = true
-    b.Font = Enum.Font.RobotoMono
-    b.AutoButtonColor = true
+    b.Name = name; b.Size = UDim2.new(0, 180, 0, 30); b.Position = pos
+    b.BackgroundColor3 = Color3.new(0, 0, 0); b.BackgroundTransparency = 0.5
+    b.TextColor3 = color; b.TextScaled = true; b.Font = Enum.Font.RobotoMono
     Instance.new("UIStroke", b).Thickness = 1
     return b
 end
@@ -51,7 +45,7 @@ local function updateStatus()
 end
 updateStatus()
 
--- ボタン・キー入力判定
+-- 入力判定
 aimBtn.MouseButton1Click:Connect(function() config.aimbot = not config.aimbot; updateStatus() end)
 fireBtn.MouseButton1Click:Connect(function() config.autoFire = not config.autoFire; updateStatus() end)
 wallBtn.MouseButton1Click:Connect(function() config.wallCheck = not config.wallCheck; updateStatus() end)
@@ -63,7 +57,7 @@ U.InputBegan:Connect(function(input, gpe)
     elseif input.KeyCode == Enum.KeyCode.J then config.wallCheck = not config.wallCheck; updateStatus() end
 end)
 
--- コーナーESP作成
+-- --- ESP描写系 ---
 local function createCornerBox(parent)
     local lines = {}
     for i = 1, 16 do
@@ -76,48 +70,26 @@ end
 
 local function updateCornerBox(lines, x, y, w, h)
     local t, l = 1.5, w * 0.25; local ot = t + 2
-    local function setPosSize(i, px, py, sx, sy)
-        if not lines[i] or not lines[i+8] then return end
+    local function set(i, px, py, sx, sy)
+        if not lines[i] then return end
         lines[i].Position, lines[i].Size = UDim2.new(0, px, 0, py), UDim2.new(0, sx, 0, sy)
         lines[i+8].Position, lines[i+8].Size = UDim2.new(0, px+1, 0, py+1), UDim2.new(0, sx-2, 0, sy-2)
     end
-    setPosSize(1, x, y, l, ot); setPosSize(2, x, y, ot, l)
-    setPosSize(3, x+w-l, y, l, ot); setPosSize(4, x+w-ot, y, ot, l)
-    setPosSize(5, x, y+h-ot, l, ot); setPosSize(6, x, y+h-l, ot, l)
-    setPosSize(7, x+w-l, y+h-ot, l, ot); setPosSize(8, x+w-ot, y+h-l, ot, l)
+    set(1,x,y,l,ot); set(2,x,y,ot,l); set(3,x+w-l,y,l,ot); set(4,x+w-ot,y,ot,l)
+    set(5,x,y+h-ot,l,ot); set(6,x,y+h-l,ot,l); set(7,x+w-l,y+h-ot,l,ot); set(8,x+w-ot,y+h-l,ot,l)
 end
 
-local function createESP(player)
+local function createESP(v)
     local f = Instance.new("Frame", gui); f.BackgroundTransparency = 1; f.Visible = false
-    local esp = {
-        Main = f, Corners = createCornerBox(f),
-        HealthNum = Instance.new("TextLabel", f),
-        BarBG = Instance.new("Frame", f), Bar = nil,
-        Name = Instance.new("TextLabel", f),
-        Ava = Instance.new("ImageLabel", f)
-    }
-    local function style(l)
-        l.BackgroundTransparency, l.TextColor3, l.TextScaled = 1, Color3.new(1,1,1), true
-        l.Font = Enum.Font.RobotoMono; Instance.new("UIStroke", l).Thickness = 1
-    end
-    style(esp.HealthNum); style(esp.Name)
-    esp.BarBG.BackgroundColor3 = Color3.new(0,0,0)
-    esp.Bar = Instance.new("Frame", esp.BarBG); esp.Bar.BorderSizePixel = 0
-    esp.Ava.BackgroundTransparency = 1; Instance.new("UIStroke", esp.Ava).Thickness = 1
+    local esp = {Main = f, Corners = createCornerBox(f), HealthNum = Instance.new("TextLabel", f), BarBG = Instance.new("Frame", f), Bar = nil, Name = Instance.new("TextLabel", f), Ava = Instance.new("ImageLabel", f)}
+    local function style(l) l.BackgroundTransparency, l.TextColor3, l.TextScaled, l.Font = 1, Color3.new(1,1,1), true, Enum.Font.RobotoMono; Instance.new("UIStroke", l).Thickness = 1 end
+    style(esp.HealthNum); style(esp.Name); esp.BarBG.BackgroundColor3 = Color3.new(0,0,0); esp.Bar = Instance.new("Frame", esp.BarBG); esp.Bar.BorderSizePixel = 0; esp.Ava.BackgroundTransparency = 1; Instance.new("UIStroke", esp.Ava).Thickness = 1
     return esp
 end
 
 local playerESP = {}
 
-local function isTarget(v)
-    if v == LP then return false end
-    local char = v.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
-    if v.Team and LP.Team and v.Team == LP.Team then return false end
-    return true
-end
-
--- メインループ
+-- --- メインループ ---
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C then return end
@@ -130,20 +102,18 @@ R.RenderStepped:Connect(function()
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local head = char and char:FindFirstChild("Head")
         
-        if hum and root and head and hum.Health > 0 and isTarget(v) then
+        if hum and root and head and hum.Health > 0 and v ~= LP and (not v.Team or v.Team ~= LP.Team) then
             if not playerESP[v] then playerESP[v] = createESP(v) end
             local esp = playerESP[v]
             local pos, onScreen = C:WorldToViewportPoint(root.Position)
             
             if onScreen then
-                local distToPlayer = (root.Position - C.CFrame.Position).Magnitude
+                local dist = (root.Position - C.CFrame.Position).Magnitude
                 local parts = C:GetPartsObscuringTarget({head.Position}, {char, LP.Character})
                 local isVisible = (#parts == 0)
 
                 local shouldShow = true
-                if config.wallCheck then
-                    if not isVisible or distToPlayer > config.maxDistance then shouldShow = false end
-                end
+                if config.wallCheck and (not isVisible or dist > config.maxDistance) then shouldShow = false end
 
                 if shouldShow then
                     local hPos = C:WorldToViewportPoint(head.Position + Vector3.new(0, 0.7, 0))
@@ -168,28 +138,29 @@ R.RenderStepped:Connect(function()
                     
                     if isVisible then
                         local distMouse = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if distMouse < nearest then target = v; nearest = distMouse end
+                        if distMouse < nearest then target = head; nearest = distMouse end
                     end
                 else esp.Main.Visible = false end
             else esp.Main.Visible = false end
         elseif playerESP[v] then playerESP[v].Main.Visible = false end
     end
 
-    -- エイム & 自動発射
+    -- --- 実行部 (Aim & Auto Fire) ---
     if target and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local head = target.Character:FindFirstChild("Head")
-        if head then
-            -- エイム移動
-            C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, head.Position), config.smooth)
-            
-            -- 自動発射（PC/実行環境用）
-            if config.autoFire then
-                if mouse1press then
-                    mouse1press()
-                    task.wait(0.05)
-                    mouse1release()
-                end
-            end
+        local pos = C:WorldToViewportPoint(target.Position)
+        local target2D = Vector2.new(pos.X, pos.Y)
+        local offset = (target2D - mousePos)
+
+        if mousemoverel then
+            -- 物理マウス移動（Executor用）
+            mousemoverel(offset.X * config.smooth, offset.Y * config.smooth)
+        else
+            -- 従来のカメラLerp（バックアップ用）
+            C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, target.Position), 0.15)
+        end
+
+        if config.autoFire and mouse1press then
+            mouse1press(); task.wait(0.02); mouse1release()
         end
     end
 end)
