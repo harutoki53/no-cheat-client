@@ -1,301 +1,159 @@
--- Rivals Script: Fixed Version
-
+-- Rivals Script: Harutoki Ultimate (Exact UI Matching Version)
 local P = game:GetService("Players")
-
 local R = game:GetService("RunService")
-
 local U = game:GetService("UserInputService")
-
 local LP = P.LocalPlayer
 
-
-
 local config = {
-
     aimbot = true,
-
+    autoFire = true,
     wallCheck = true,
-
-    smooth = 0.1,
-
+    isPC = true,
+    smooth = 0.4,
     fov = 150,
-
-    maxSize = 400
-
+    pcFov = 800,
+    maxDistance = 1000,
+    menuOpen = false
 }
 
-
-
--- UIの親を確実に取得
-
-local ParentGui = (gethui and gethui()) or game:GetService("CoreGui") or LP:WaitForChild("PlayerGui")
-
-local gui = Instance.new("ScreenGui")
-
+local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 gui.Name = "HarutokiUltimate"
-
 gui.IgnoreGuiInset = true
 
-gui.Parent = ParentGui
+-- --- ESPオブジェクト作成 (画像レイアウトを1ピクセル単位で再現) ---
+local function createESP(v)
+    local container = Instance.new("Frame", gui)
+    container.BackgroundTransparency = 1; container.Visible = false
 
-
-
--- コーナー作成
-
-local function createCornerBox(parent)
-
-    local lines = {}
-
-    for i = 1, 16 do
-
-        local line = Instance.new("Frame", parent)
-
-        line.BackgroundColor3 = (i <= 8) and Color3.new(0, 0, 0) or Color3.new(1, 1, 1)
-
-        line.BorderSizePixel = 0
-
-        line.ZIndex = (i <= 8) and 1 or 2
-
-        lines[i] = line
-
+    -- 1. コーナーボックス (メインの枠)
+    local function createCorner(parent)
+        local lines = {}
+        for i = 1, 8 do
+            local l = Instance.new("Frame", parent)
+            l.BackgroundColor3 = Color3.new(1, 1, 1); l.BorderSizePixel = 0
+            lines[i] = l
+        end
+        return lines
     end
+    local corners = createCorner(container)
 
-    return lines
+    -- 2. 敵の名前 (上部中央)
+    local name = Instance.new("TextLabel", container)
+    name.Size = UDim2.new(1, 0, 0, 15); name.Position = UDim2.new(0, 0, 0, -18)
+    
+    -- 3. 敵の体力数値 (左上)
+    local healthNum = Instance.new("TextLabel", container)
+    healthNum.Size = UDim2.new(0, 40, 0, 15); healthNum.Position = UDim2.new(0, -45, 0, -5)
+    healthNum.TextXAlignment = Enum.TextXAlignment.Right
 
-end
+    -- 4. 敵のアバター (中央)
+    local ava = Instance.new("ImageLabel", container)
+    ava.Size = UDim2.new(0.5, 0, 0.5, 0); ava.Position = UDim2.new(0.25, 0, 0.25, 0)
+    ava.BackgroundTransparency = 1
 
+    -- 5. 体力バー (左側・縦)
+    local barBG = Instance.new("Frame", container)
+    barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -8, 0, 0)
+    barBG.BackgroundColor3 = Color3.new(0, 0, 0)
+    local bar = Instance.new("Frame", barBG); bar.BorderSizePixel = 0; bar.Size = UDim2.new(1, 0, 1, 0)
+    bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0)
 
+    -- 6. レベルと連勝 (右下)
+    local stats = Instance.new("TextLabel", container)
+    stats.Size = UDim2.new(1, 100, 0, 15); stats.Position = UDim2.new(1, 5, 1, -5)
+    stats.TextXAlignment = Enum.TextXAlignment.Left
 
-local function updateCornerBox(lines, x, y, w, h)
-
-    local t, l = 1.5, w * 0.25
-
-    local ot = t + 2
-
-    local function setPosSize(i, px, py, sx, sy)
-
-        if not lines[i] or not lines[i+8] then return end
-
-        lines[i].Position, lines[i].Size = UDim2.new(0, px, 0, py), UDim2.new(0, sx, 0, sy)
-
-        lines[i+8].Position, lines[i+8].Size = UDim2.new(0, px+1, 0, py+1), UDim2.new(0, sx-2, 0, sy-2)
-
+    local function style(t) 
+        t.BackgroundTransparency, t.TextColor3, t.Font, t.TextScaled = 1, Color3.new(1, 1, 1), Enum.Font.RobotoMono, true
+        Instance.new("UIStroke", t).Thickness = 1
     end
+    style(name); style(healthNum); style(stats)
 
-    setPosSize(1, x, y, l, ot); setPosSize(2, x, y, ot, l)
-
-    setPosSize(3, x+w-l, y, l, ot); setPosSize(4, x+w-ot, y, ot, l)
-
-    setPosSize(5, x, y+h-ot, l, ot); setPosSize(6, x, y+h-l, ot, l)
-
-    setPosSize(7, x+w-l, y+h-ot, l, ot); setPosSize(8, x+w-ot, y+h-l, ot, l)
-
+    return {Main = container, Corners = corners, Name = name, HealthNum = healthNum, Ava = ava, Bar = bar, Stats = stats}
 end
 
-
-
-local function createESP(player)
-
-    local f = Instance.new("Frame", gui)
-
-    f.BackgroundTransparency = 1
-
-    f.Visible = false
-
-    local esp = {
-
-        Main = f, Corners = createCornerBox(f),
-
-        HealthNum = Instance.new("TextLabel", f),
-
-        BarBG = Instance.new("Frame", f), Bar = nil,
-
-        Name = Instance.new("TextLabel", f),
-
-        Ava = Instance.new("ImageLabel", f),
-
-        Info = Instance.new("TextLabel", f)
-
-    }
-
-    local function style(l)
-
-        l.BackgroundTransparency, l.TextColor3, l.TextScaled = 1, Color3.new(1,1,1), true
-
-        l.Font = Enum.Font.RobotoMono
-
-        local s = Instance.new("UIStroke", l)
-
-        s.Thickness = 1
-
-    end
-
-    style(esp.HealthNum); style(esp.Name); style(esp.Info)
-
-    esp.BarBG.BackgroundColor3 = Color3.new(0,0,0)
-
-    esp.Bar = Instance.new("Frame", esp.BarBG); esp.Bar.BorderSizePixel = 0
-
-    esp.Ava.BackgroundTransparency = 1; Instance.new("UIStroke", esp.Ava).Thickness = 1
-
-    return esp
-
+local function updateCorners(lines, w, h)
+    local l = math.clamp(w * 0.2, 5, 20); local t = 1.5
+    lines[1].Size, lines[1].Position = UDim2.new(0, l, 0, t), UDim2.new(0, 0, 0, 0)
+    lines[2].Size, lines[2].Position = UDim2.new(0, t, 0, l), UDim2.new(0, 0, 0, 0)
+    lines[3].Size, lines[3].Position = UDim2.new(0, l, 0, t), UDim2.new(0, w-l, 0, 0)
+    lines[4].Size, lines[4].Position = UDim2.new(0, t, 0, l), UDim2.new(0, w-t, 0, 0)
+    lines[5].Size, lines[5].Position = UDim2.new(0, l, 0, t), UDim2.new(0, 0, 0, h-t)
+    lines[6].Size, lines[6].Position = UDim2.new(0, t, 0, l), UDim2.new(0, 0, 0, h-l)
+    lines[7].Size, lines[7].Position = UDim2.new(0, l, 0, t), UDim2.new(0, w-l, 0, h-t)
+    lines[8].Size, lines[8].Position = UDim2.new(0, t, 0, l), UDim2.new(0, w-t, 0, h-l)
 end
 
+local pESP = {}
 
-
-local playerESP = {}
-
-
-
--- 試合中の敵判定（ロビー以外）
-
-local function isTarget(v)
-
-    if v == LP then return false end
-
-    local char = v.Character
-
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
-
-    -- Rivalsのチーム判定
-
-    if v.Team and LP.Team and v.Team == LP.Team then return false end
-
-    if v.Team and v.Team.Name == "Lobby" then return false end
-
-    return true
-
-end
-
-
-
+-- --- メインループ ---
 R.RenderStepped:Connect(function()
-
     local C = workspace.CurrentCamera
-
     if not C then return end
-
-    local mousePos = U:GetMouseLocation()
-
-    local target, nearest = nil, config.fov
-
-
+    local center = Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2)
+    local currentFov = config.isPC and config.pcFov or config.fov
+    local target, nearest = nil, currentFov
 
     for _, v in pairs(P:GetPlayers()) do
+        if v ~= LP and v.Character and v.Character:FindFirstChild("Humanoid") then
+            local char = v.Character; local hum = char.Humanoid
+            if hum.Health > 0 and (not v.Team or v.Team ~= LP.Team) then
+                if not pESP[v] then pESP[v] = createESP(v) end
+                local esp = pESP[v]; local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local pos, onScreen = C:WorldToViewportPoint(root.Position)
+                    if onScreen then
+                        local hPos = C:WorldToViewportPoint(char.Head.Position + Vector3.new(0, 1, 0))
+                        local fPos = C:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+                        local h = math.abs(hPos.Y - fPos.Y); local w = h * 0.7
+                        
+                        esp.Main.Visible = true; esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/2); esp.Main.Size = UDim2.new(0, w, 0, h)
+                        updateCorners(esp.Corners, w, h)
+                        
+                        esp.Name.Text = v.DisplayName
+                        esp.HealthNum.Text = math.floor(hum.Health)
+                        
+                        -- 体力バーの色指定 (画像通り)
+                        local hp = hum.Health
+                        local color = Color3.new(1, 0, 0) -- 0-25: 赤
+                        if hp > 80 then color = Color3.new(0, 1, 0)        -- 80-100: 緑
+                        elseif hp > 50 then color = Color3.new(1, 1, 0)    -- 50-80: 黄色
+                        elseif hp > 25 then color = Color3.new(1, 0.5, 0)  -- 25-50: オレンジ
+                        end
+                        esp.Bar.Size = UDim2.new(1, 0, hp/hum.MaxHealth, 0)
+                        esp.Bar.BackgroundColor3 = color
+                        esp.HealthNum.TextColor3 = color
 
-        local char = v.Character
+                        esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
+                        
+                        -- レベルと連勝の取得 (リーダーボード等から)
+                        local lv = v:FindFirstChild("leaderstats") and v.leaderstats:FindFirstChild("Level") and v.leaderstats.Level.Value or 0
+                        local ws = v:FindFirstChild("leaderstats") and v.leaderstats:FindFirstChild("Streak") and v.leaderstats.Streak.Value or 0
+                        esp.Stats.Text = "Lv: "..lv..(ws > 0 and " ["..ws.." Win]" or "")
 
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-
-        local head = char and char:FindFirstChild("Head")
-
-        
-
-        if hum and root and head and hum.Health > 0 and isTarget(v) then
-
-            if not playerESP[v] then playerESP[v] = createESP(v) end
-
-            local esp = playerESP[v]
-
-            local pos, onScreen = C:WorldToViewportPoint(root.Position)
-
-            
-
-            if onScreen then
-
-                local hPos = C:WorldToViewportPoint(head.Position + Vector3.new(0, 0.7, 0))
-
-                local lPos = C:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-
-                local h = math.clamp(math.abs(hPos.Y - lPos.Y), 40, config.maxSize)
-
-                local w = h * 0.6
-
-                local x, y = pos.X - w/2, pos.Y - h/2
-
-                
-
-                esp.Main.Visible = true
-
-                updateCornerBox(esp.Corners, x, y, w, h)
-
-                
-
-                local p = hum.Health / hum.MaxHealth
-
-                esp.HealthNum.Text = tostring(math.floor(hum.Health))
-
-                esp.HealthNum.Position, esp.HealthNum.Size = UDim2.new(0, x - 40, 0, y - 18), UDim2.new(0, 35, 0, 15)
-
-                esp.BarBG.Position, esp.BarBG.Size = UDim2.new(0, x - 8, 0, y), UDim2.new(0, 4, 0, h)
-
-                esp.Bar.Size = UDim2.new(1, 0, p, 0)
-
-                esp.Bar.BackgroundColor3 = p > 0.5 and Color3.new(0,1,0) or Color3.new(1,0,0)
-
-                
-
-                esp.Name.Text = v.DisplayName
-
-                esp.Name.Position, esp.Name.Size = UDim2.new(0, x, 0, y - 20), UDim2.new(0, w, 0, 18)
-
-                esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
-
-                esp.Ava.Position, esp.Ava.Size = UDim2.new(0, x + w + 5, 0, y), UDim2.new(0, h*0.3, 0, h*0.3)
-
-                
-
-                if not config.wallCheck or #C:GetPartsObscuringTarget({head.Position}, {char}) == 0 then
-
-                    local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-
-                    if dist < nearest then target, nearest = v, dist end
-
+                        -- エイム判定
+                        local isVisible = #C:GetPartsObscuringTarget({char.Head.Position}, {char, LP.Character}) == 0
+                        if (not config.wallCheck) or isVisible then
+                            local dC = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                            if dC < nearest then target = char.Head; nearest = dC end
+                        end
+                    else esp.Main.Visible = false end
                 end
-
-            else esp.Main.Visible = false end
-
-        elseif playerESP[v] then
-
-            playerESP[v].Main.Visible = false
-
+            elseif pESP[v] then pESP[v].Main.Visible = false end
         end
-
     end
 
-
-
-    -- オートエイム (右クリック)
-
-    if target and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-
-        local head = target.Character:FindFirstChild("Head")
-
-        if head then
-
-            local headPos = C:WorldToViewportPoint(head.Position)
-
-            local targetPos = Vector2.new(headPos.X, headPos.Y)
-
-            local move = (targetPos - mousePos) * config.smooth
-
-            if mousemoverel then
-
-                mousemoverel(move.X, move.Y)
-
+    -- エイム動作 (PC/スマホ共通)
+    if target and config.aimbot then
+        local isAim = config.isPC and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or not config.isPC
+        if isAim then
+            local pos = C:WorldToViewportPoint(target.Position)
+            if config.isPC and mousemoverel then
+                mousemoverel((pos.X - center.X) * config.smooth, (pos.Y - center.Y) * config.smooth)
             else
-
-                -- 予備のエイム方式
-
-                C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, head.Position), config.smooth)
-
+                C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, target.Position), config.smooth * 0.4)
             end
-
+            if config.autoFire and mouse1press then mouse1press(); task.wait(0.01); mouse1release() end
         end
-
     end
-
 end)
