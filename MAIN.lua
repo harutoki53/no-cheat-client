@@ -1,4 +1,4 @@
--- Rivals Script: Harutoki Ultimate (Combined Fix & Visual)
+-- Rivals Script: Harutoki Ultimate (Final Auto-Fire Fix)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -22,23 +22,18 @@ gui.Name = "HarutokiUltimate"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 
--- 古いUIの削除
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
 
--- --- チーム判定関数 (改良) ---
+-- --- チーム判定関数 ---
 local function isEnemy(v)
     if not v or v == LP then return false end
-    -- チーム設定があるゲームの場合
-    if LP.Team and v.Team then
-        return LP.Team ~= v.Team
-    end
-    -- チーム設定がなくTeamColorで判別する場合
+    if LP.Team and v.Team then return LP.Team ~= v.Team end
     if v:FindFirstChild("TeamColor") and LP:FindFirstChild("TeamColor") then
         return v.TeamColor ~= LP.TeamColor
     end
-    return true -- 判定不能な場合は敵とみなす
+    return true
 end
 
 -- --- FOV円 ---
@@ -48,7 +43,7 @@ fovCircle.AnchorPoint = Vector2.new(0.5, 0.5); fovCircle.Position = UDim2.new(0.
 Instance.new("UICorner", fovCircle).CornerRadius = UDim.new(1, 0)
 local fovStroke = Instance.new("UIStroke", fovCircle); fovStroke.Color = Color3.new(1, 1, 1); fovStroke.Thickness = 1
 
--- --- 設定メニュー (変更なし) ---
+-- --- 設定メニュー ---
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 300); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -150)
 menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.Visible = false
@@ -115,10 +110,10 @@ R.RenderStepped:Connect(function()
     if not C or not LP.Character or not LP.Character:FindFirstChild("PrimaryPart") then return end
     local center = Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2)
     local targetHead = nil
+    local canShoot = false  -- オートファイア許可
     local nearestDist = (config.isPC and config.pcFov or config.fov)
 
     for _, v in pairs(P:GetPlayers()) do
-        -- 1. 敵かどうかを厳密に判定
         if not isEnemy(v) then 
             if pESP[v] then pESP[v].Main.Visible = false end
             continue 
@@ -126,38 +121,39 @@ R.RenderStepped:Connect(function()
 
         local char = v.Character; local hum = char and char:FindFirstChild("Humanoid")
         local head = char and char:FindFirstChild("Head")
-        local root = char and char:FindFirstChild("HumanoidRootPart")
 
         if head and hum and hum.Health > 0 then
             local dist = (head.Position - LP.Character.PrimaryPart.Position).Magnitude
-            
-            -- 2. 距離制限
             if dist <= config.maxDistance then
                 if not pESP[v] then pESP[v] = createESP(v) end
                 local esp = pESP[v]
                 local pos, onScreen = C:WorldToViewportPoint(head.Position)
 
-                -- 3. 壁越し判定 (Raycast改良)
-                local isVisible = true
-                if config.wallCheck then
-                    local params = RaycastParams.new()
-                    params.FilterDescendantsInstances = {LP.Character, char, workspace.CurrentCamera}
-                    params.FilterType = Enum.RaycastFilterType.Exclude
-                    local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, params)
-                    if result then isVisible = false end
+                -- 【重要】発射用の視認性チェック (常に壁を判定する)
+                local actuallyVisible = false
+                if onScreen then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = {LP.Character, char, workspace.CurrentCamera}
+                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                    local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
+                    if not result then actuallyVisible = true end -- 何も遮るものがない
                 end
 
-                -- 4. ESPとターゲット選定
-                if onScreen and isVisible then
+                -- エイム用の視認性判定 (メニューのFilter設定に従う)
+                local aimVisible = true
+                if config.wallCheck and not actuallyVisible then aimVisible = false end
+
+                if onScreen and aimVisible then
                     esp.Main.Visible = true
-                    -- エイムの計算を頭(Head)に固定
                     local mouseDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     if mouseDist < nearestDist then
                         targetHead = head
                         nearestDist = mouseDist
+                        -- 画面内にいて、かつ壁に遮られていない時だけ発射許可を出す
+                        if actuallyVisible then canShoot = true end
                     end
                     
-                    -- ESPの位置調整
+                    -- ESP更新
                     local h = math.clamp(1000/pos.Z, 20, 500); local w = h * 0.7
                     esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/2); esp.Main.Size = UDim2.new(0, w, 0, h)
                     esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health)
@@ -167,26 +163,26 @@ R.RenderStepped:Connect(function()
                 else
                     if esp then esp.Main.Visible = false end
                 end
-            else
-                if pESP[v] then pESP[v].Main.Visible = false end
-            end
+            elseif pESP[v] then pESP[v].Main.Visible = false end
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    -- 5. エイム実行 (頭のみをターゲット)
+    -- 5. エイムとオートファイアの実行
     if targetHead and config.aimbot then
-        local isAim = config.isPC and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or not config.isPC
-        if isAim then
+        local isAiming = config.isPC and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or not config.isPC
+        if isAiming then
             local pos, _ = C:WorldToViewportPoint(targetHead.Position)
             local targetPos = Vector2.new(pos.X, pos.Y)
             
+            -- エイム吸い付き
             if config.isPC and mousemoverel then
                 mousemoverel((targetPos.X - center.X) * config.smooth, (targetPos.Y - center.Y) * config.smooth)
             else
                 C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, targetHead.Position), config.smooth * 0.2)
             end
             
-            if config.autoFire and mouse1press then
+            -- オートファイア (canShootがtrueの時のみ)
+            if config.autoFire and canShoot and mouse1press then
                 mouse1press(); task.wait(0.01); mouse1release()
             end
         end
