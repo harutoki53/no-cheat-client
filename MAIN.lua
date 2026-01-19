@@ -1,4 +1,4 @@
--- Rivals Script: Harutoki Ultimate (Exact Image Layout)
+-- Rivals Script: Harutoki Ultimate (Final Stable Version)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -10,18 +10,20 @@ local config = {
     wallCheck = true,
     isPC = true,
     smooth = 0.4,
-    fov = 150,
-    pcFov = 800,
+    fov = 150,        -- スマホ用
+    pcFov = 800,      -- PC用 (固定)
     maxDistance = 1000,
     menuOpen = false
 }
 
+-- GUI初期化
 local gui = Instance.new("ScreenGui")
 gui.Name = "HarutokiUltimate"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = LP:WaitForChild("PlayerGui")
 
+-- 重複防止
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
@@ -33,7 +35,7 @@ fovCircle.AnchorPoint = Vector2.new(0.5, 0.5); fovCircle.Position = UDim2.new(0.
 Instance.new("UICorner", fovCircle).CornerRadius = UDim.new(1, 0)
 Instance.new("UIStroke", fovCircle).Color = Color3.new(1, 1, 1)
 
--- --- メインUI ---
+-- --- 設定ウィンドウ ---
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 280); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -140)
 menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.BackgroundTransparency = 0.1; menuFrame.Visible = false
@@ -56,7 +58,7 @@ local function updateUI()
     modeToggle.Text = "MODE: " .. (config.isPC and "PC" or "MOBILE")
     menuFrame.Visible = config.menuOpen; fovBtn.Visible = not config.isPC
     fovCircle.Visible = (not config.isPC and config.aimbot); fovCircle.Size = UDim2.new(0, config.fov * 2, 0, config.fov * 2)
-    aimBtn.Text = "AIMBOT: " .. (config.aimbot and "ON" or "OFF"); fireBtn.Text = "AUTO FIRE: " .. (config.autoFire and "ON" or "OFF"); wallBtn.Text = "FILTER: " .. (config.wallCheck and "ON" or "OFF"); fovBtn.Text = "MOBILE FOV: " .. config.fov
+    aimBtn.Text = "AIM: " .. (config.aimbot and "ON" or "OFF"); fireBtn.Text = "FIRE: " .. (config.autoFire and "ON" or "OFF"); wallBtn.Text = "FILTER: " .. (config.wallCheck and "ON" or "OFF"); fovBtn.Text = "FOV: " .. config.fov
 end
 
 modeToggle.MouseButton1Click:Connect(function() config.isPC = not config.isPC; config.menuOpen = false; updateUI() end)
