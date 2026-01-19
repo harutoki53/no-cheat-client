@@ -1,5 +1,3 @@
-今これで
-
 -- Rivals Script: Harutoki Ultimate (Combined Fix & Visual)
 
 local P = game:GetService("Players")
