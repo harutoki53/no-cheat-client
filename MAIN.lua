@@ -7,25 +7,25 @@ local LP = P.LocalPlayer
 local config = {
     aimbot = true,
     autoFire = true,  -- 自動発射
-    wallCheck = true, -- フィルター（壁・天井・遠距離制限）
+    wallCheck = true, -- ONの間は壁裏・天井裏・遠距離を非表示
     smooth = 0.12,
     fov = 150,
     maxSize = 400,
-    maxDistance = 500
+    maxDistance = 500 -- 遠すぎる敵を隠す距離
 }
 
--- UIの親を取得
+-- UIの親を確実に取得
 local ParentGui = (gethui and gethui()) or game:GetService("CoreGui") or LP:WaitForChild("PlayerGui")
 local gui = Instance.new("ScreenGui")
 gui.Name = "HarutokiGodMode"
 gui.IgnoreGuiInset = true
 gui.Parent = ParentGui
 
--- --- ステータスボタン作成（スマホ対応タップボタン） ---
+-- --- ステータス表示（タップ可能なボタン形式） ---
 local function createButton(name, pos, color)
     local b = Instance.new("TextButton", gui)
     b.Name = name
-    b.Size = UDim2.new(0, 160, 0, 30)
+    b.Size = UDim2.new(0, 180, 0, 30)
     b.Position = pos
     b.BackgroundColor3 = Color3.new(0, 0, 0)
     b.BackgroundTransparency = 0.5
@@ -42,19 +42,26 @@ local fireBtn = createButton("FireBtn", UDim2.new(0, 10, 0, 45), Color3.new(1, 0
 local wallBtn = createButton("WallBtn", UDim2.new(0, 10, 0, 80), Color3.new(0, 1, 1))
 
 local function updateStatus()
-    aimBtn.Text = "AIMBOT: " .. (config.aimbot and "ON" or "OFF")
+    aimBtn.Text = "AIMBOT: " .. (config.aimbot and "ON [K]" or "OFF [K]")
     aimBtn.TextColor3 = config.aimbot and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-    fireBtn.Text = "AUTO FIRE: " .. (config.autoFire and "ON" or "OFF")
+    fireBtn.Text = "AUTO FIRE: " .. (config.autoFire and "ON [L]" or "OFF [L]")
     fireBtn.TextColor3 = config.autoFire and Color3.new(1, 0.8, 0) or Color3.new(1, 0, 0)
-    wallBtn.Text = "FILTER: " .. (config.wallCheck and "ON" or "OFF")
+    wallBtn.Text = "FILTER: " .. (config.wallCheck and "ON [J]" or "OFF [J]")
     wallBtn.TextColor3 = config.wallCheck and Color3.new(0, 1, 1) or Color3.new(1, 0.5, 0)
 end
 updateStatus()
 
--- タップ/クリック処理
+-- ボタン・キー入力判定
 aimBtn.MouseButton1Click:Connect(function() config.aimbot = not config.aimbot; updateStatus() end)
 fireBtn.MouseButton1Click:Connect(function() config.autoFire = not config.autoFire; updateStatus() end)
 wallBtn.MouseButton1Click:Connect(function() config.wallCheck = not config.wallCheck; updateStatus() end)
+
+U.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.K then config.aimbot = not config.aimbot; updateStatus()
+    elseif input.KeyCode == Enum.KeyCode.L then config.autoFire = not config.autoFire; updateStatus()
+    elseif input.KeyCode == Enum.KeyCode.J then config.wallCheck = not config.wallCheck; updateStatus() end
+end)
 
 -- コーナーESP作成
 local function createCornerBox(parent)
@@ -69,16 +76,18 @@ end
 
 local function updateCornerBox(lines, x, y, w, h)
     local t, l = 1.5, w * 0.25; local ot = t + 2
-    local function set(i, px, py, sx, sy)
-        if not lines[i] then return end
+    local function setPosSize(i, px, py, sx, sy)
+        if not lines[i] or not lines[i+8] then return end
         lines[i].Position, lines[i].Size = UDim2.new(0, px, 0, py), UDim2.new(0, sx, 0, sy)
         lines[i+8].Position, lines[i+8].Size = UDim2.new(0, px+1, 0, py+1), UDim2.new(0, sx-2, 0, sy-2)
     end
-    set(1,x,y,l,ot); set(2,x,y,ot,l); set(3,x+w-l,y,l,ot); set(4,x+w-ot,y,ot,l)
-    set(5,x,y+h-ot,l,ot); set(6,x,y+h-l,ot,l); set(7,x+w-l,y+h-ot,l,ot); set(8,x+w-ot,y+h-l,ot,l)
+    setPosSize(1, x, y, l, ot); setPosSize(2, x, y, ot, l)
+    setPosSize(3, x+w-l, y, l, ot); setPosSize(4, x+w-ot, y, ot, l)
+    setPosSize(5, x, y+h-ot, l, ot); setPosSize(6, x, y+h-l, ot, l)
+    setPosSize(7, x+w-l, y+h-ot, l, ot); setPosSize(8, x+w-ot, y+h-l, ot, l)
 end
 
-local function createESP(v)
+local function createESP(player)
     local f = Instance.new("Frame", gui); f.BackgroundTransparency = 1; f.Visible = false
     local esp = {
         Main = f, Corners = createCornerBox(f),
@@ -100,6 +109,14 @@ end
 
 local playerESP = {}
 
+local function isTarget(v)
+    if v == LP then return false end
+    local char = v.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
+    if v.Team and LP.Team and v.Team == LP.Team then return false end
+    return true
+end
+
 -- メインループ
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
@@ -113,20 +130,19 @@ R.RenderStepped:Connect(function()
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local head = char and char:FindFirstChild("Head")
         
-        if hum and root and head and hum.Health > 0 and v ~= LP and v.Team ~= LP.Team then
+        if hum and root and head and hum.Health > 0 and isTarget(v) then
             if not playerESP[v] then playerESP[v] = createESP(v) end
             local esp = playerESP[v]
             local pos, onScreen = C:WorldToViewportPoint(root.Position)
             
             if onScreen then
-                local dist = (root.Position - C.CFrame.Position).Magnitude
+                local distToPlayer = (root.Position - C.CFrame.Position).Magnitude
                 local parts = C:GetPartsObscuringTarget({head.Position}, {char, LP.Character})
                 local isVisible = (#parts == 0)
 
                 local shouldShow = true
                 if config.wallCheck then
-                    -- 壁裏・天井裏・遠距離を非表示
-                    if not isVisible or dist > config.maxDistance then shouldShow = false end
+                    if not isVisible or distToPlayer > config.maxDistance then shouldShow = false end
                 end
 
                 if shouldShow then
@@ -141,14 +157,14 @@ R.RenderStepped:Connect(function()
                     
                     local p = hum.Health / hum.MaxHealth
                     esp.HealthNum.Text = tostring(math.floor(hum.Health))
-                    esp.HealthNum.Position, esp.HealthNum.Size = UDim2.new(0, x - 40, 0, y - 18), UDim2.new(0, 35, 0, 15)
-                    esp.BarBG.Position, esp.BarBG.Size = UDim2.new(0, x - 8, 0, y), UDim2.new(0, 4, 0, h)
+                    esp.HealthNum.Position, esp.HealthNum.Size = UDim2.new(0, x-40, 0, y-18), UDim2.new(0, 35, 0, 15)
+                    esp.BarBG.Position, esp.BarBG.Size = UDim2.new(0, x-8, 0, y), UDim2.new(0, 4, 0, h)
                     esp.Bar.Size = UDim2.new(1, 0, p, 0)
                     esp.Bar.BackgroundColor3 = p > 0.5 and Color3.new(0,1,0) or Color3.new(1,0,0)
                     esp.Name.Text = v.DisplayName
-                    esp.Name.Position, esp.Name.Size = UDim2.new(0, x, 0, y - 20), UDim2.new(0, w, 0, 18)
+                    esp.Name.Position, esp.Name.Size = UDim2.new(0, x, 0, y-20), UDim2.new(0, w, 0, 18)
                     esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
-                    esp.Ava.Position, esp.Ava.Size = UDim2.new(0, x + w + 5, 0, y), UDim2.new(0, h*0.3, 0, h*0.3)
+                    esp.Ava.Position, esp.Ava.Size = UDim2.new(0, x+w+5, 0, y), UDim2.new(0, h*0.3, 0, h*0.3)
                     
                     if isVisible then
                         local distMouse = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
@@ -160,13 +176,13 @@ R.RenderStepped:Connect(function()
     end
 
     -- エイム & 自動発射
-    if target and config.aimbot then
-        local head = target.Character.Head
-        -- 右クリック（スマホならエイム中）で吸い付き
-        if U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+    if target and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local head = target.Character:FindFirstChild("Head")
+        if head then
+            -- エイム移動
             C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, head.Position), config.smooth)
             
-            -- 自動発射（ターゲットが見えている時のみ）
+            -- 自動発射（PC/実行環境用）
             if config.autoFire then
                 if mouse1press then
                     mouse1press()
@@ -177,8 +193,3 @@ R.RenderStepped:Connect(function()
         end
     end
 end)
-    end
-
-end)
-
-updateUI()
