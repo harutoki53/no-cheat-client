@@ -1,166 +1,174 @@
---[[
-    Harutoki Ultimate - High Density Edition
-    - デザイン: 画像の「コーナー枠」「左体力バー」「上数値」「右アバター」をミリ単位で再現
-    - フィルターON: 視認不可または500スタッド以上を「完全に非表示・演算除外」
-    - フィルターOFF: 壁越しでも表示・吸い付きを行うが、射撃のみロック
-    - 自動発射: 壁越しはON/OFF問わず絶対に撃たない
-    - 設定画面: LeftShift / RightShift 両対応 (※管理者設定は完全に排除)
---]]
-
+-- Rivals Script: Harutoki Ultimate (Full Restore & Engine Fix)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
 local LP = P.LocalPlayer
-local Camera = workspace.CurrentCamera
 
--- --- 内部データ構造 (省略なし) ---
 local config = {
     aimbot = true,
     autoFire = true,
-    filter = true,       -- これが「フィルター」機能
-    smooth = 0.32,
-    pcFov = 650,
-    maxDist = 500,       -- 500スタッド制限
-    menuOpen = false,
-    themeColor = Color3.fromRGB(255, 255, 255),
-    visibleEnemyColor = Color3.fromRGB(0, 255, 0),
-    hiddenEnemyColor = Color3.fromRGB(255, 0, 0)
+    wallCheck = true, -- FILTER: ON(見える敵のみ) / OFF(壁越しもエイム)
+    smooth = 0.4,
+    pcFov = 800,
+    maxDistance = 1000,
+    menuOpen = false
 }
 
--- --- GUI 完全構築レイヤー ---
+-- --- GUI完全復元 (最前面表示) ---
 local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
-gui.Name = "HarutokiUltimate_V5"
+gui.Name = "HarutokiUltimate"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
-gui.DisplayOrder = 10000
+gui.DisplayOrder = 9999
 
--- --- 設定画面UI (管理者機能を一切排除した純粋版) ---
-local menu = Instance.new("Frame", gui)
-menu.Size = UDim2.new(0, 320, 0, 250)
-menu.Position = UDim2.new(0.5, -160, 0.5, -125)
-menu.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-menu.BorderSizePixel = 0
-menu.Visible = false
-local mStroke = Instance.new("UIStroke", menu); mStroke.Color = Color3.new(1,1,1); mStroke.Thickness = 2
-local mCorner = Instance.new("UICorner", menu); mCorner.CornerRadius = UDim.new(0, 12)
-
-local title = Instance.new("TextLabel", menu)
-title.Size = UDim2.new(1, 0, 0, 50); title.Text = "HARUTOKI SETTINGS"; title.TextColor3 = Color3.new(1,1,1)
-title.BackgroundTransparency = 1; title.Font = Enum.Font.SourceSansBold; title.TextSize = 22
-
-local function createToggle(name, pos, configKey)
-    local btn = Instance.new("TextButton", menu)
-    btn.Size = UDim2.new(0.8, 0, 0, 40); btn.Position = UDim2.new(0.1, 0, 0, pos)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.SourceSansBold; btn.TextSize = 16
-    Instance.new("UICorner", btn)
-    
-    local function updateText()
-        btn.Text = name .. ": " .. (config[configKey] and "ON" or "OFF")
-        btn.TextColor3 = config[configKey] and Color3.new(0,1,0) or Color3.new(1,0,0)
-    end
-    
-    btn.MouseButton1Click:Connect(function()
-        config[configKey] = not config[configKey]
-        updateText()
-    end)
-    updateText()
+-- 古いUIのクリーンアップ
+for _, v in pairs(LP.PlayerGui:GetChildren()) do
+    if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
 
-createToggle("AIMBOT", 70, "aimbot")
-createToggle("AUTO FIRE", 120, "autoFire")
-createToggle("FILTER (WALLS)", 170, "filter")
-
--- --- チーム検証ロジック ---
-local function isEnemy(target)
-    if not target or target == LP then return false end
-    if LP.Team and target.Team then return LP.Team ~= target.Team end
+-- --- チーム判定関数 (起点コード継承) ---
+local function isEnemy(v)
+    if not v or v == LP then return false end
+    if LP.Team and v.Team then return LP.Team ~= v.Team end
+    if v:FindFirstChild("TeamColor") and LP:FindFirstChild("TeamColor") then
+        return v.TeamColor ~= LP.TeamColor
+    end
     return true
 end
 
--- --- 精密ESP描画ロジック (画像のデザインをドット単位でシミュレート) ---
+-- --- 設定メニュー (元のデザインを完全復元) ---
+local menuFrame = Instance.new("Frame", gui)
+menuFrame.Size = UDim2.new(0, 220, 0, 300); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -150)
+menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.Visible = false
+Instance.new("UIStroke", menuFrame).Color = Color3.new(1, 1, 1); Instance.new("UICorner", menuFrame)
+
+local function createMenuBtn(txt, y)
+    local b = Instance.new("TextButton", menuFrame); b.Size = UDim2.new(0.9, 0, 0, 35); b.Position = UDim2.new(0.05, 0, 0, y)
+    b.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2); b.TextColor3 = Color3.new(1, 1, 1); b.Text = txt; b.TextScaled = true; b.Font = Enum.Font.RobotoMono
+    Instance.new("UICorner", b); return b
+end
+
+local aimBtn = createMenuBtn("AIMBOT", 50)
+local fireBtn = createMenuBtn("AUTO FIRE", 95)
+local wallBtn = createMenuBtn("FILTER", 140)
+local closeBtn = createMenuBtn("CLOSE", 185)
+
+local function updateUI()
+    menuFrame.Visible = config.menuOpen
+    aimBtn.Text = "AIM: " .. (config.aimbot and "ON" or "OFF")
+    fireBtn.Text = "FIRE: " .. (config.autoFire and "ON" or "OFF")
+    wallBtn.Text = "FILTER: " .. (config.wallCheck and "ON" or "OFF")
+end
+
+aimBtn.MouseButton1Click:Connect(function() config.aimbot = not config.aimbot; updateUI() end)
+fireBtn.MouseButton1Click:Connect(function() config.autoFire = not config.autoFire; updateUI() end)
+wallBtn.MouseButton1Click:Connect(function() config.wallCheck = not config.wallCheck; updateUI() end)
+closeBtn.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
+
+U.InputBegan:Connect(function(i, gpe)
+    if not gpe and i.KeyCode == Enum.KeyCode.RightShift then
+        config.menuOpen = not config.menuOpen; updateUI()
+    end
+end)
+
+-- --- ESPオブジェクト管理 (アバター・体力バー完全実装) ---
 local pESP = {}
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
+    local mainFrame = Instance.new("Frame", container); mainFrame.Size = UDim2.new(1, 0, 1, 0); mainFrame.BackgroundTransparency = 1; local stroke = Instance.new("UIStroke", mainFrame); stroke.Thickness = 2
+    local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 15); name.Position = UDim2.new(0, 0, 0, -18)
+    local healthNum = Instance.new("TextLabel", container); healthNum.Size = UDim2.new(0, 40, 0, 15); healthNum.Position = UDim2.new(0, -45, 0, -5)
+    local ava = Instance.new("ImageLabel", container); ava.Size = UDim2.new(0.6, 0, 0.6, 0); ava.Position = UDim2.new(0.2, 0, 0.2, 0); ava.BackgroundTransparency = 1
+    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -8, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0)
+    local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0)
     
-    local function drawLine(pos, size)
-        local f = Instance.new("Frame", container); f.BackgroundColor3 = config.themeColor; f.BorderSizePixel = 0; f.Position = pos; f.Size = size; return f
+    local function style(t)
+        t.BackgroundTransparency, t.TextColor3, t.Font, t.TextScaled = 1, Color3.new(1, 1, 1), Enum.Font.RobotoMono, true
+        Instance.new("UIStroke", t)
     end
-    local t, l = 2.5, 12
-    drawLine(UDim2.new(0,0,0,0), UDim2.new(0,l,0,t)); drawLine(UDim2.new(0,0,0,0), UDim2.new(0,t,0,l))
-    drawLine(UDim2.new(1,-l,0,0), UDim2.new(0,l,0,t)); drawLine(UDim2.new(1,-t,0,0), UDim2.new(0,t,0,l))
-    drawLine(UDim2.new(0,0,1,-t), UDim2.new(0,l,0,t)); drawLine(UDim2.new(0,0,1,-l), UDim2.new(0,t,0,l))
-    drawLine(UDim2.new(1,-l,1,-t), UDim2.new(0,l,0,t)); drawLine(UDim2.new(1,-t,1,-l), UDim2.new(0,t,0,l))
-
-    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 6, 1, 0); barBG.Position = UDim2.new(0, -15, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0); barBG.BorderSizePixel = 0
-    local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.Position = UDim2.new(0, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.BackgroundColor3 = config.visibleEnemyColor; bar.BorderSizePixel = 0
-    local hNum = Instance.new("TextLabel", container); hNum.Size = UDim2.new(1, 0, 0, 26); hNum.Position = UDim2.new(0, 0, 0, -52); hNum.BackgroundTransparency = 1; hNum.TextColor3 = Color3.new(1,1,1); hNum.Font = Enum.Font.SourceSansBold; hNum.TextScaled = true; Instance.new("UIStroke", hNum).Thickness = 1.8
-    local nL = Instance.new("TextLabel", container); nL.Size = UDim2.new(1, 0, 0, 14); nL.Position = UDim2.new(0, 0, 0, -24); nL.BackgroundTransparency = 1; nL.TextColor3 = Color3.new(1,1,1); nL.Font = Enum.Font.SourceSans; nL.TextScaled = true; Instance.new("UIStroke", nL)
-    local ava = Instance.new("ImageLabel", container); ava.Size = UDim2.new(0, 32, 0, 32); ava.Position = UDim2.new(1, 12, 0, 0); ava.BackgroundColor3 = Color3.new(0,0,0); Instance.new("UIStroke", ava).Color = Color3.new(1,1,1)
+    style(name); style(healthNum)
     
-    pESP[v] = {Main = container, Bar = bar, HealthNum = hNum, Name = nL, Ava = ava}
+    pESP[v] = {Main = container, Name = name, HealthNum = healthNum, Ava = ava, Bar = bar, Stroke = stroke}
     return pESP[v]
 end
 
--- --- メイン演算エンジン ---
+-- --- メインエンジン (オートエイム & 自動発射) ---
 R.RenderStepped:Connect(function()
-    if not Camera or not LP.Character then return end
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    local targetUnit, nearestDist = nil, config.pcFov
-    local canFire = false
+    local C = workspace.CurrentCamera
+    if not C or not LP.Character then return end
+    
+    local center = Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2)
+    local targetHead, nearestDist = nil, config.pcFov
+    local fireAllowed = false
 
     for _, v in pairs(P:GetPlayers()) do
-        if not isEnemy(v) then if pESP[v] then pESP[v].Main.Visible = false end continue end
-        local char = v.Character; local head = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart"))
+        if not isEnemy(v) then 
+            if pESP[v] then pESP[v].Main.Visible = false end
+            continue 
+        end
+
+        local char = v.Character
+        -- RivalsのHitboxパーツ名に対応
+        local head = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart", true))
         local hum = char and char:FindFirstChildWhichIsA("Humanoid")
 
         if head and hum and hum.Health > 0 then
-            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-            local dist = (head.Position - Camera.CFrame.Position).Magnitude
-            
-            -- 壁判定の実施
-            local rayParams = RaycastParams.new(); rayParams.FilterDescendantsInstances = {LP.Character, char, Camera}
-            local isVisible = not workspace:Raycast(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * dist, rayParams)
+            local pos, onScreen = C:WorldToViewportPoint(head.Position)
+            local dist = (head.Position - C.CFrame.Position).Magnitude
 
-            -- 【厳格フィルター】
-            local display = onScreen and dist <= config.maxDist
-            if config.filter and not isVisible then display = false end
-
-            if display then
+            if onScreen and dist <= config.maxDistance then
                 local esp = pESP[v] or createESP(v)
-                esp.Main.Visible = true
-                local s = math.clamp(1000/pos.Z, 12, 450); local w = s * 0.75
-                esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - s/2); esp.Main.Size = UDim2.new(0, w, 0, s)
-                esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health); esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
-                esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
-                esp.Bar.BackgroundColor3 = isVisible and config.visibleEnemyColor or config.hiddenEnemyColor
+                
+                -- 壁判定 (厳密Raycast)
+                local rayParams = RaycastParams.new()
+                rayParams.FilterDescendantsInstances = {LP.Character, char, C}
+                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
+                local isVisible = not result
 
-                -- エイム判定
-                if (not config.filter) or isVisible then
-                    local mDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if mDist < nearestDist then targetUnit = head; nearestDist = mDist end
+                -- ESP更新
+                esp.Main.Visible = true
+                local h = math.clamp(1000/pos.Z, 10, 500); local w = h * 0.7
+                esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/2); esp.Main.Size = UDim2.new(0, w, 0, h)
+                esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health)
+                esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
+                
+                -- 色設定
+                local color = isVisible and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+                esp.Stroke.Color = color
+                esp.Bar.BackgroundColor3 = color
+                esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
+
+                -- エイム判定 (FILTERロジック)
+                if (not config.wallCheck) or isVisible then
+                    local mouseDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if mouseDist < nearestDist then
+                        targetHead = head
+                        nearestDist = mouseDist
+                    end
                 end
-                -- 自動発射判定
-                if isVisible and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 100 then canFire = true end
+
+                -- 自動発射判定 (壁越しは撃たないルール)
+                if isVisible and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 100 then
+                    fireAllowed = true
+                end
             elseif pESP[v] then pESP[v].Main.Visible = false end
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    if targetUnit and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local p = Camera:WorldToViewportPoint(targetUnit.Position)
-        if mousemoverel then mousemoverel((p.X - center.X) * config.smooth, (p.Y - center.Y) * config.smooth) end
+    -- オートエイム実行
+    if targetHead and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local pos, _ = C:WorldToViewportPoint(targetHead.Position)
+        if mousemoverel then
+            mousemoverel((pos.X - center.X) * config.smooth, (pos.Y - center.Y) * config.smooth)
+        end
     end
-    if config.autoFire and canFire and mouse1press then
+
+    -- 自動発射実行 (視認可能時のみ)
+    if config.autoFire and fireAllowed and mouse1press then
         mouse1press(); task.wait(0.01); mouse1release()
     end
 end)
 
--- --- キー入力 (左右Shift両対応) ---
-U.InputBegan:Connect(function(i, g)
-    if not g then
-        if i.KeyCode == Enum.KeyCode.LeftShift or i.KeyCode == Enum.KeyCode.RightShift then
-            config.menuOpen = not config.menuOpen
-            menu.Visible = config.menuOpen
-        end
-    end
-end)
+updateUI()
+print("Harutoki Ultimate: All Systems Online")
