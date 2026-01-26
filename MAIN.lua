@@ -25,14 +25,9 @@ for _, v in pairs(LP.PlayerGui:GetChildren()) do
 end
 
 local menuFrame = Instance.new("Frame", gui)
-menuFrame.Size = UDim2.new(0, 220, 0, 420); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -210)
+menuFrame.Size = UDim2.new(0, 220, 0, 400); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -200)
 menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.Visible = false
 Instance.new("UIStroke", menuFrame).Color = Color3.new(1, 1, 1); Instance.new("UICorner", menuFrame)
-
-local credits = Instance.new("TextLabel", menuFrame)
-credits.Size = UDim2.new(1, 0, 0, 20); credits.Position = UDim2.new(0, 0, 1, 5)
-credits.BackgroundTransparency = 1; credits.TextColor3 = Color3.new(1, 1, 1); credits.Font = Enum.Font.RobotoMono
-credits.Text = "create by harutoki53"; credits.TextSize = 12
 
 local function createMenuBtn(txt, y)
     local b = Instance.new("TextButton", menuFrame); b.Size = UDim2.new(0.9, 0, 0, 35); b.Position = UDim2.new(0.05, 0, 0, y)
@@ -46,7 +41,7 @@ local btns = {
     fire = createMenuBtn("FIRE: OFF", 140),
     wall = createMenuBtn("FILTER: ON", 185),
     esp = createMenuBtn("ESP FIL: ON", 230),
-    hide = createMenuBtn("HIDE: OFF", 275),
+    hide = createMenuBtn("HIDE UI: OFF", 275),
     close = createMenuBtn("CLOSE", 320)
 }
 
@@ -56,7 +51,7 @@ local function updateUI()
     btns.mode.Text = "MODE(U): " .. config.aimMode
     btns.fire.Text = "FIRE(K): " .. (config.autoFire and "ON" or "OFF")
     btns.wall.Text = "WALL(L): " .. (config.wallCheck and "ON" or "OFF")
-    btns.esp.Text = "ESP(N): " .. (config.espFilter and "ON" or "OFF")
+    btns.esp.Text = "ESP FIL(N): " .. (config.espFilter and "ON" or "OFF")
     btns.hide.Text = "HIDE(M): " .. (config.hideUI and "ON" or "OFF")
 end
 
@@ -70,12 +65,14 @@ local actions = {
     menu = function() config.menuOpen = not config.menuOpen; updateUI() end
 }
 
+-- ボタンクリック
 for k, v in pairs(btns) do if k ~= "close" then v.MouseButton1Click:Connect(function() actions[k]() end) end end
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- キー入力判定 (InputBeganで確実に検知) ---
+-- --- ★キー判定（ここが修正ポイント） ---
 U.InputBegan:Connect(function(input, processed)
-    if processed then return end
+    if processed then return end -- チャット中などは反応させない
+    
     local key = input.KeyCode
     if key == Enum.KeyCode.RightShift then actions.menu()
     elseif key == Enum.KeyCode.J then actions.aim()
@@ -87,21 +84,23 @@ U.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- --- ESP ---
+-- --- ESP構築 ---
 local pESP = {}
 local function createESP(v)
-    local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false; container.AnchorPoint = Vector2.new(0.5, 0.5)
-    local stroke = Instance.new("UIStroke", Instance.new("Frame", container)); stroke.Thickness = 2; stroke.Color = Color3.new(0, 1, 0); stroke.Parent.Size = UDim2.new(1,0,1,0); stroke.Parent.BackgroundTransparency = 1
-    local ava = Instance.new("ImageLabel", container); ava.Size = UDim2.new(0.6, 0, 0.6, 0); ava.Position = UDim2.new(0.2, 0, 0.2, 0); ava.BackgroundTransparency = 1; ava.ImageTransparency = 0.3
+    local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false; container.ZIndex = 5
+    local box = Instance.new("Frame", container); box.Size = UDim2.new(1, 0, 1, 0); box.BackgroundTransparency = 1
+    local stroke = Instance.new("UIStroke", box); stroke.Thickness = 2; stroke.Color = Color3.new(0, 1, 0)
     local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -7, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0)
     local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0); bar.BorderSizePixel = 0
     local hNum = Instance.new("TextLabel", container); hNum.Size = UDim2.new(0, 40, 0, 15); hNum.Position = UDim2.new(0, -50, 0.5, -7); hNum.BackgroundTransparency = 1; hNum.TextColor3 = Color3.new(1,1,1); hNum.Font = Enum.Font.RobotoMono; hNum.TextScaled = true; Instance.new("UIStroke", hNum)
     local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 15); name.Position = UDim2.new(0, 0, 0, -20); name.BackgroundTransparency = 1; name.TextColor3 = Color3.new(1,1,1); name.Font = Enum.Font.RobotoMono; name.TextScaled = true; Instance.new("UIStroke", name)
-    pESP[v] = {Main = container, Name = name, HealthNum = hNum, Bar = bar, Stroke = stroke, Ava = ava}
+    pESP[v] = {Main = container, Name = name, HealthNum = hNum, Bar = bar, Stroke = stroke}
     return pESP[v]
 end
 
--- --- Main Loop ---
+-- --- メインエンジン ---
+local currentTarget = nil
+
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C or not LP.Character then return end
@@ -111,40 +110,48 @@ R.RenderStepped:Connect(function()
 
     for _, v in pairs(P:GetPlayers()) do
         if v == LP or (LP.Team and v.Team == LP.Team) then if pESP[v] then pESP[v].Main.Visible = false end continue end
-        local ch = v.Character; local root = ch and ch:FindFirstChild("HumanoidRootPart")
+        local ch = v.Character; local head = ch and ch:FindFirstChild("Head")
         local hum = ch and ch:FindFirstChildWhichIsA("Humanoid")
         
-        if root and hum and hum.Health > 0 then
-            local pos, vis = C:WorldToViewportPoint(root.Position)
-            local canSee = vis
-            if config.wallCheck then
-                local res = workspace:Raycast(C.CFrame.Position, (root.Position - C.CFrame.Position), RaycastParams.new())
-                if res and not res.Instance:IsDescendantOf(ch) then canSee = false end
-            end
+        if head and hum and hum.Health > 0 then
+            local pos, vis = C:WorldToViewportPoint(head.Position)
+            local rayParams = RaycastParams.new(); rayParams.FilterDescendantsInstances = {LP.Character, ch, C}; rayParams.FilterType = Enum.RaycastFilterType.Exclude
+            local res = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position), rayParams)
+            local canSee = (not res) and vis
 
             if vis then
                 local esp = pESP[v] or createESP(v)
                 local show = (not config.hideUI) and ((not config.espFilter) or canSee)
                 esp.Main.Visible = show
                 if show then
-                    local dist = (C.CFrame.Position - root.Position).Magnitude
-                    local hS = math.clamp(2300/dist, 15, 800); local wS = hS * 0.7
-                    esp.Main.Position = UDim2.new(0, pos.X, 0, pos.Y); esp.Main.Size = UDim2.new(0, wS, 0, hS)
+                    local dist = (C.CFrame.Position - head.Position).Magnitude
+                    local hS = math.clamp(2300/dist, 10, 800); local wS = hS * 0.7
+                    esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/2); esp.Main.Size = UDim2.new(0, wS, 0, hS)
                     esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health)
-                    esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
                     local col = canSee and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-                    esp.Stroke.Color = col; esp.Bar.BackgroundColor3 = col; esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0); esp.HealthNum.TextColor3 = col
+                    esp.Stroke.Color = col; esp.Bar.BackgroundColor3 = col; esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
                 end
-                if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < near then target = ch:FindFirstChild("Head") or root; near = (Vector2.new(pos.X, pos.Y) - center).Magnitude end
+
+                if canSee or (not config.wallCheck and vis) then
+                    local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if d < near then target = head; near = d end
+                end
                 if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 120 then fireOk = true end
             elseif pESP[v] then pESP[v].Main.Visible = false end
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    if config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and target then
-        local p, vis = C:WorldToViewportPoint(target.Position)
-        if vis and mousemoverel then mousemoverel((p.X - center.X) * config.smooth, (p.Y - center.Y) * config.smooth) end
-    end
+    -- エイム
+    if config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        if config.aimMode == "STICKY" then
+            if not currentTarget or not currentTarget.Parent or currentTarget.Parent:FindFirstChildWhichIsA("Humanoid").Health <= 0 then currentTarget = target end
+        else currentTarget = target end
+        if currentTarget then
+            local p, vis = C:WorldToViewportPoint(currentTarget.Position)
+            if vis and mousemoverel then mousemoverel((p.X - center.X) * config.smooth, (p.Y - center.Y) * config.smooth) end
+        end
+    else currentTarget = nil end
+
     if config.autoFire and fireOk and mouse1press then mouse1press(); task.wait(0.01); mouse1release() end
 end)
 updateUI()
