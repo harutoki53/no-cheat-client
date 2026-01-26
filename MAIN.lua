@@ -1,4 +1,4 @@
--- Rivals Script: Harutoki Ultimate (Full Restore with HIDE-UI)
+-- Rivals Script: Harutoki Ultimate (Full ESP Restore & Keybinds)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -12,7 +12,7 @@ local config = {
     pcFov = 800,
     maxDistance = 1000,
     menuOpen = false,
-    hideUI = true -- [追加] デフォルトでON
+    hideUI = true -- デフォルトON
 }
 
 -- --- GUI完全復元 ---
@@ -22,7 +22,6 @@ gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 9999
 
--- クリーンアップ
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
@@ -37,7 +36,7 @@ local function isEnemy(v)
     return true
 end
 
--- --- 設定メニュー (元のデザインを完全復元 + HIDE UI追加) ---
+-- --- 設定メニュー (元のデザイン完全復元) ---
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 320); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -150)
 menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.Visible = false
@@ -52,7 +51,7 @@ end
 local aimBtn = createMenuBtn("AIMBOT", 50)
 local fireBtn = createMenuBtn("AUTO FIRE", 95)
 local wallBtn = createMenuBtn("FILTER", 140)
-local hideBtn = createMenuBtn("HIDE UI", 185) -- [追加]
+local hideBtn = createMenuBtn("HIDE UI", 185)
 local closeBtn = createMenuBtn("CLOSE", 230)
 
 local function updateUI()
@@ -63,19 +62,29 @@ local function updateUI()
     hideBtn.Text = "HIDE UI: " .. (config.hideUI and "ON" or "OFF")
 end
 
+-- --- キーバインド設定 (J, K, L, ;) ---
+U.InputBegan:Connect(function(i, gpe)
+    if gpe then return end
+    if i.KeyCode == Enum.KeyCode.RightShift then
+        config.menuOpen = not config.menuOpen; updateUI()
+    elseif i.KeyCode == Enum.KeyCode.J then
+        config.aimbot = not config.aimbot; updateUI()
+    elseif i.KeyCode == Enum.KeyCode.K then
+        config.autoFire = not config.autoFire; updateUI()
+    elseif i.KeyCode == Enum.KeyCode.L then
+        config.wallCheck = not config.wallCheck; updateUI()
+    elseif i.KeyCode == Enum.KeyCode.Semicolon then -- ";"キー
+        config.hideUI = not config.hideUI; updateUI()
+    end
+end)
+
 aimBtn.MouseButton1Click:Connect(function() config.aimbot = not config.aimbot; updateUI() end)
 fireBtn.MouseButton1Click:Connect(function() config.autoFire = not config.autoFire; updateUI() end)
 wallBtn.MouseButton1Click:Connect(function() config.wallCheck = not config.wallCheck; updateUI() end)
 hideBtn.MouseButton1Click:Connect(function() config.hideUI = not config.hideUI; updateUI() end)
 closeBtn.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
-U.InputBegan:Connect(function(i, gpe)
-    if not gpe and i.KeyCode == Enum.KeyCode.RightShift then
-        config.menuOpen = not config.menuOpen; updateUI()
-    end
-end)
-
--- --- ESPオブジェクト管理 (アバター・体力バー完全実装) ---
+-- --- ESPオブジェクト管理 (完全復元) ---
 local pESP = {}
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
@@ -124,9 +133,9 @@ R.RenderStepped:Connect(function()
                 local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
                 local isVisible = not result
 
-                -- [HIDE UI判定] ONなら表示しない、OFFなら表示
+                -- [重要] HIDE UI判定：OFFの時だけESPを表示
                 esp.Main.Visible = not config.hideUI
-                
+
                 if not config.hideUI then
                     local h = math.clamp(1000/pos.Z, 10, 500); local w = h * 0.7
                     esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/2); esp.Main.Size = UDim2.new(0, w, 0, h)
@@ -138,7 +147,6 @@ R.RenderStepped:Connect(function()
                     esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
                 end
 
-                -- エイム判定 (UIが隠れていても動作)
                 if (not config.wallCheck) or isVisible then
                     local mouseDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     if mouseDist < nearestDist then
@@ -167,4 +175,4 @@ R.RenderStepped:Connect(function()
 end)
 
 updateUI()
-print("Harutoki Ultimate: UI Hide Mode Ready")
+print("Harutoki Ultimate: Keyboard Shortcuts Active (J,K,L,;)")
