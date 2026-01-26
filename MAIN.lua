@@ -1,4 +1,4 @@
--- Rivals Script: Harutoki Ultimate (Error Fixed)
+-- Rivals Script: Harutoki Ultimate (Xeno Optimization)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -14,25 +14,30 @@ local config = {
     menuOpen = false
 }
 
--- --- GUI作成 (エラーの出た行を修正) ---
+-- --- GUI作成 (Xenoのエラー回避) ---
 local gui = Instance.new("ScreenGui")
--- エラー対策: 親を後から設定し、問題のプロパティを削除
 gui.Name = "HarutokiUltimate"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 9999
--- gui.DisplayOnAppWindow = false  <-- これがエラーの原因だったので削除しました
 
--- 実行環境によっては CoreGui に入れることで OBS に映らなくなる場合があります
-local success, parent = pcall(function() return game:GetService("CoreGui") end)
-gui.Parent = success and parent or LP:WaitForChild("PlayerGui")
+-- Xenoで最も安全に隠せる CoreGui への配置を試行
+local parentUI
+local success = pcall(function()
+    parentUI = game:GetService("CoreGui")
+end)
 
--- 古いUIのクリーンアップ
-for _, v in pairs(gui.Parent:GetChildren()) do
+if not success or not parentUI then
+    parentUI = LP:WaitForChild("PlayerGui")
+end
+gui.Parent = parentUI
+
+-- 古いUIを確実に削除
+for _, v in pairs(parentUI:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
 
--- --- チーム判定関数 ---
+-- --- チーム判定 ---
 local function isEnemy(v)
     if not v or v == LP then return false end
     if LP.Team and v.Team then return LP.Team ~= v.Team end
@@ -71,20 +76,21 @@ fireBtn.MouseButton1Click:Connect(function() config.autoFire = not config.autoFi
 wallBtn.MouseButton1Click:Connect(function() config.wallCheck = not config.wallCheck; updateUI() end)
 closeBtn.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
+-- メニュー開閉 (RightShift)
 U.InputBegan:Connect(function(i, gpe)
     if not gpe and i.KeyCode == Enum.KeyCode.RightShift then
         config.menuOpen = not config.menuOpen; updateUI()
     end
 end)
 
--- --- ESPオブジェクト管理 ---
+-- --- ESP ---
 local pESP = {}
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
-    local mainFrame = Instance.new("Frame", container); mainFrame.Size = UDim2.new(1, 0, 1, 0); mainFrame.BackgroundTransparency = 1; local stroke = Instance.new("UIStroke", mainFrame); stroke.Thickness = 2
+    local mainFrame = Instance.new("Frame", container); mainFrame.Size = UDim2.new(1, 0, 1, 0); mainFrame.BackgroundTransparency = 1
+    local stroke = Instance.new("UIStroke", mainFrame); stroke.Thickness = 2
     local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 15); name.Position = UDim2.new(0, 0, 0, -18)
     local healthNum = Instance.new("TextLabel", container); healthNum.Size = UDim2.new(0, 40, 0, 15); healthNum.Position = UDim2.new(0, -45, 0, -5)
-    local ava = Instance.new("ImageLabel", container); ava.Size = UDim2.new(0.6, 0, 0.6, 0); ava.Position = UDim2.new(0.2, 0, 0.2, 0); ava.BackgroundTransparency = 1
     local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -8, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0)
     local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0)
     
@@ -94,11 +100,11 @@ local function createESP(v)
     end
     style(name); style(healthNum)
     
-    pESP[v] = {Main = container, Name = name, HealthNum = healthNum, Ava = ava, Bar = bar, Stroke = stroke}
+    pESP[v] = {Main = container, Name = name, HealthNum = healthNum, Bar = bar, Stroke = stroke}
     return pESP[v]
 end
 
--- --- メインエンジン ---
+-- --- メインループ ---
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C or not LP.Character then return end
@@ -114,7 +120,7 @@ R.RenderStepped:Connect(function()
         end
 
         local char = v.Character
-        local head = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart", true))
+        local head = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart"))
         local hum = char and char:FindFirstChildWhichIsA("Humanoid")
 
         if head and hum and hum.Health > 0 then
@@ -133,8 +139,8 @@ R.RenderStepped:Connect(function()
                 esp.Main.Visible = true
                 local h = math.clamp(1000/pos.Z, 10, 500); local w = h * 0.7
                 esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/2); esp.Main.Size = UDim2.new(0, w, 0, h)
-                esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health)
-                esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
+                esp.Name.Text = v.DisplayName
+                esp.HealthNum.Text = math.floor(hum.Health)
                 
                 local color = isVisible and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
                 esp.Stroke.Color = color
@@ -156,6 +162,7 @@ R.RenderStepped:Connect(function()
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
+    -- エイム・射撃実行
     if targetHead and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local pos, _ = C:WorldToViewportPoint(targetHead.Position)
         if mousemoverel then
@@ -169,4 +176,4 @@ R.RenderStepped:Connect(function()
 end)
 
 updateUI()
-print("Harutoki Ultimate: Fixed & Running")
+print("Harutoki Ultimate: Running on Xeno (CoreGui Bypass)")
