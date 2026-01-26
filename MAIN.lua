@@ -1,4 +1,4 @@
--- Rivals Script: Harutoki Ultimate (Full Restore & Engine Fix)
+-- Rivals Script: Harutoki Ultimate (Error Fixed)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -14,19 +14,21 @@ local config = {
     menuOpen = false
 }
 
--- --- GUI完全復元 (最前面表示 & キャプチャ回避設定) ---
-local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+-- --- GUI作成 (エラーの出た行を修正) ---
+local gui = Instance.new("ScreenGui")
+-- エラー対策: 親を後から設定し、問題のプロパティを削除
 gui.Name = "HarutokiUltimate"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 9999
+-- gui.DisplayOnAppWindow = false  <-- これがエラーの原因だったので削除しました
 
--- 【重要】OBSなどのキャプチャソフトに映らなくする設定
--- ※環境によっては機能しない場合がありますが、Roblox公式のキャプチャ回避策です。
-gui.DisplayOnAppWindow = false 
+-- 実行環境によっては CoreGui に入れることで OBS に映らなくなる場合があります
+local success, parent = pcall(function() return game:GetService("CoreGui") end)
+gui.Parent = success and parent or LP:WaitForChild("PlayerGui")
 
 -- 古いUIのクリーンアップ
-for _, v in pairs(LP.PlayerGui:GetChildren()) do
+for _, v in pairs(gui.Parent:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
 
@@ -167,4 +169,4 @@ R.RenderStepped:Connect(function()
 end)
 
 updateUI()
-print("Harutoki Ultimate: All Systems Online (Stream-Proof Enabled)")
+print("Harutoki Ultimate: Fixed & Running")
