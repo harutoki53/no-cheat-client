@@ -11,9 +11,9 @@ local config = {
     espFilter = true,
     smooth = 0.2,
     pcFov = 500,
-    maxDist = 400, -- ★これより遠い敵には吸い付かない・ESP出さない
+    maxDist = 400,
     menuOpen = false,
-    hideUI = true  -- デフォルトON（実行時ESP非表示）
+    hideUI = true -- 実行時から隠す
 }
 
 -- --- GUI ---
@@ -82,8 +82,15 @@ U.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- --- ESP & クリーンアップ ---
+-- --- ESP & 徹底クリーンアップ ---
 local pESP = {}
+local function removeESP(player)
+    if pESP[player] then
+        if pESP[player].Main then pESP[player].Main:Destroy() end
+        pESP[player] = nil
+    end
+end
+
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false; container.ZIndex = 5
     local box = Instance.new("Frame", container); box.Size = UDim2.new(1, 0, 1, 0); box.BackgroundTransparency = 1
@@ -96,28 +103,21 @@ local function createESP(v)
     return pESP[v]
 end
 
-P.PlayerRemoving:Connect(function(player)
-    if pESP[player] then
-        pESP[player].Main:Destroy()
-        pESP[player] = nil
-    end
-end)
+P.PlayerRemoving:Connect(removeESP)
 
--- --- 確率用関数 ---
-local function getTargetPos(char, camCF)
+-- --- 確率用関数 (頭90% / 胴体10%) ---
+local function getTargetPos(char)
     local chance = math.random(1, 100)
-    if chance <= 50 then
-        return char.Head.Position -- 50% 頭
-    elseif chance <= 90 then
-        return (char:FindFirstChild("UpperTorso") or char:FindFirstChild("HumanoidRootPart")).Position -- 40% 胴体
+    if chance <= 90 then
+        return char:FindFirstChild("Head") -- 90% 頭
     else
-        return char.Head.Position + (camCF.RightVector * 3) -- 10% 真横
+        return char:FindFirstChild("UpperTorso") or char:FindFirstChild("HumanoidRootPart") -- 10% 胴体
     end
 end
 
 -- --- メインエンジン ---
 local currentTargetChar = nil
-local currentAimPoint = nil
+local currentAimPart = nil
 
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
@@ -127,14 +127,18 @@ R.RenderStepped:Connect(function()
     local fireOk = false
 
     for _, v in pairs(P:GetPlayers()) do
-        if v == LP or (LP.Team and v.Team == LP.Team) then if pESP[v] then pESP[v].Main.Visible = false end continue end
+        if v == LP or (LP.Team and v.Team == LP.Team) then 
+            if pESP[v] then pESP[v].Main.Visible = false end 
+            continue 
+        end
+        
         local ch = v.Character; local head = ch and ch:FindFirstChild("Head")
         local hum = ch and ch:FindFirstChildWhichIsA("Humanoid")
         
         if head and hum and hum.Health > 0 then
             local dist = (C.CFrame.Position - head.Position).Magnitude
             
-            -- ★距離制限（遠すぎる敵は無視）
+            -- ★距離制限
             if dist > config.maxDist then
                 if pESP[v] then pESP[v].Main.Visible = false end
                 continue
@@ -149,7 +153,6 @@ R.RenderStepped:Connect(function()
 
             if vis then
                 local esp = pESP[v] or createESP(v)
-                -- ★HIDE設定がONなら絶対表示しない
                 local show = (not config.hideUI) and ((not config.espFilter) or canSee)
                 esp.Main.Visible = show
                 if show then
@@ -166,27 +169,33 @@ R.RenderStepped:Connect(function()
                 end
                 if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 120 then fireOk = true end
             elseif pESP[v] then pESP[v].Main.Visible = false end
-        elseif pESP[v] then pESP[v].Main.Visible = false end
+        elseif pESP[v] then 
+            -- キャラクターが死んだり消えたりした瞬間に非表示
+            pESP[v].Main.Visible = false 
+        end
     end
 
-    -- エイム（リアルタイム確率計算）
+    -- エイム（確率計算）
     if config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         if target then
             if currentTargetChar ~= target then
                 currentTargetChar = target
-                currentAimPoint = getTargetPos(target, C.CFrame) -- ターゲット捕捉時に確率で部位決定
+                currentAimPart = getTargetPos(target) -- 捕捉時に抽選
             end
             
-            if currentAimPoint then
-                local p, vis = C:WorldToViewportPoint(currentAimPoint)
+            -- 部位が消えていないかチェック
+            if currentAimPart and currentAimPart.Parent then
+                local p, vis = C:WorldToViewportPoint(currentAimPart.Position)
                 if vis and mousemoverel then
                     mousemoverel((p.X - center.X) * config.smooth, (p.Y - center.Y) * config.smooth)
                 end
+            else
+                currentAimPart = getTargetPos(currentTargetChar) -- 部位がなければ再抽選
             end
         end
     else
         currentTargetChar = nil
-        currentAimPoint = nil
+        currentAimPart = nil
     end
 
     if config.autoFire and fireOk and mouse1press then mouse1press(); task.wait(0.01); mouse1release() end
