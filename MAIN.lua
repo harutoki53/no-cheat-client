@@ -4,29 +4,34 @@ local U = game:GetService("UserInputService")
 local LP = P.LocalPlayer
 
 local config = {
-    aimbot = false,
-    aimMode = "STICKY", 
-    autoFire = false,
+    aimbot = true,     -- エイム自体の有効化
+    autoFire = true,
     wallCheck = true,
-    espFilter = true,
-    smooth = 0.15,      -- 吸いつきを少し強化
-    pcFov = 400,
-    maxDist = 500,     -- 遠くの敵を無視（値を調整可能）
+    smooth = 0.4,      -- お気に入りの設定値を継承
+    pcFov = 800,
+    maxDistance = 500, -- 遠くは見せない
     menuOpen = false,
-    hideUI = true
+    hideUI = true      -- 最初は非表示
 }
 
--- --- GUI ---
+-- --- GUI (Harutoki Ultimate) ---
 local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
-gui.Name = "HarutokiUltimate_Final_Complete"
-gui.IgnoreGuiInset = true; gui.ResetOnSpawn = false
+gui.Name = "HarutokiUltimate_Final"
+gui.IgnoreGuiInset = true; gui.ResetOnSpawn = false; gui.DisplayOrder = 9999
 
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
-    if v.Name:find("HarutokiUltimate") and v ~= gui then v:Destroy() end
+    if v.Name == "HarutokiUltimate_Final" and v ~= gui then v:Destroy() end
 end
 
+local function isEnemy(v)
+    if not v or v == LP then return false end
+    if LP.Team and v.Team then return LP.Team ~= v.Team end
+    return true
+end
+
+-- --- 設定メニュー ---
 local menuFrame = Instance.new("Frame", gui)
-menuFrame.Size = UDim2.new(0, 220, 0, 400); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -200)
+menuFrame.Size = UDim2.new(0, 220, 0, 350); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -175)
 menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.Visible = false
 Instance.new("UIStroke", menuFrame).Color = Color3.new(1, 1, 1); Instance.new("UICorner", menuFrame)
 
@@ -37,162 +42,123 @@ local function createMenuBtn(txt, y)
 end
 
 local btns = {
-    aim = createMenuBtn("AIM: OFF", 50),
-    mode = createMenuBtn("MODE: STICKY", 95),
-    fire = createMenuBtn("FIRE: OFF", 140),
-    wall = createMenuBtn("WALL FIL: ON", 185),
-    esp = createMenuBtn("DIST FIL: ON", 230),
-    hide = createMenuBtn("HIDE UI: ON", 275),
-    close = createMenuBtn("CLOSE", 320)
+    aim = createMenuBtn("AIM: ON", 50),
+    fire = createMenuBtn("FIRE: ON", 95),
+    wall = createMenuBtn("WALL FIL: ON", 140),
+    hide = createMenuBtn("ESP: OFF", 185), -- 最初はOFF
+    close = createMenuBtn("CLOSE", 230)
 }
 
 local function updateUI()
     menuFrame.Visible = config.menuOpen
-    btns.aim.Text = "AIM(J): " .. (config.aimbot and "ON" or "OFF")
-    btns.mode.Text = "MODE(U): " .. config.aimMode
-    btns.fire.Text = "FIRE(K): " .. (config.autoFire and "ON" or "OFF")
-    btns.wall.Text = "WALL(L): " .. (config.wallCheck and "ON" or "OFF")
-    btns.esp.Text = "DIST(N): " .. (config.espFilter and "ON" or "OFF")
-    btns.hide.Text = "HIDE(M): " .. (config.hideUI and "ON" or "OFF")
+    btns.aim.Text = "AIM: " .. (config.aimbot and "ON" or "OFF")
+    btns.fire.Text = "FIRE: " .. (config.autoFire and "ON" or "OFF")
+    btns.wall.Text = "WALL: " .. (config.wallCheck and "ON" or "OFF")
+    btns.hide.Text = "ESP: " .. (config.hideUI and "OFF" or "ON")
 end
 
-local actions = {
-    aim = function() config.aimbot = not config.aimbot; updateUI() end,
-    mode = function() config.aimMode = (config.aimMode == "LOCK" and "STICKY" or "LOCK"); updateUI() end,
-    fire = function() config.autoFire = not config.autoFire; updateUI() end,
-    wall = function() config.wallCheck = not config.wallCheck; updateUI() end,
-    esp = function() config.espFilter = not config.espFilter; updateUI() end,
-    hide = function() config.hideUI = not config.hideUI; updateUI() end,
-    menu = function() config.menuOpen = not config.menuOpen; updateUI() end
-}
-
-for k, v in pairs(btns) do if k ~= "close" then v.MouseButton1Click:Connect(function() actions[k]() end) end end
+btns.aim.MouseButton1Click:Connect(function() config.aimbot = not config.aimbot; updateUI() end)
+btns.fire.MouseButton1Click:Connect(function() config.autoFire = not config.autoFire; updateUI() end)
+btns.wall.MouseButton1Click:Connect(function() config.wallCheck = not config.wallCheck; updateUI() end)
+btns.hide.MouseButton1Click:Connect(function() config.hideUI = not config.hideUI; updateUI() end)
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
-U.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    local key = input.KeyCode
-    if key == Enum.KeyCode.RightShift then actions.menu()
-    elseif key == Enum.KeyCode.J then actions.aim()
-    elseif key == Enum.KeyCode.K then actions.fire()
-    elseif key == Enum.KeyCode.L then actions.wall()
-    elseif key == Enum.KeyCode.N then actions.esp()
-    elseif key == Enum.KeyCode.M then actions.hide()
-    end
+U.InputBegan:Connect(function(i, gpe)
+    if gpe then return end
+    if i.KeyCode == Enum.KeyCode.RightShift then config.menuOpen = not config.menuOpen; updateUI()
+    elseif i.KeyCode == Enum.KeyCode.M then config.hideUI = not config.hideUI; updateUI() end
 end)
 
 -- --- ESP ---
 local pESP = {}
 local function createESP(v)
-    if v == LP then return nil end 
+    if v == LP then return nil end -- 自分には絶対につけない
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
-    local box = Instance.new("Frame", container); box.Size = UDim2.new(1, 0, 1, 0); box.BackgroundTransparency = 1
-    local stroke = Instance.new("UIStroke", box); stroke.Thickness = 2; stroke.Color = Color3.new(0, 1, 0)
-    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -7, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0); barBG.BorderSizePixel = 0
-    local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0); bar.BackgroundColor3 = Color3.new(0, 1, 0); bar.BorderSizePixel = 0
-    local hNum = Instance.new("TextLabel", container); hNum.Size = UDim2.new(0, 40, 0, 14); hNum.Position = UDim2.new(0, -50, 0.5, -7); hNum.BackgroundTransparency = 1; hNum.TextColor3 = Color3.new(1,1,1); hNum.Font = Enum.Font.RobotoMono; hNum.TextScaled = true; hNum.TextXAlignment = Enum.TextXAlignment.Right; Instance.new("UIStroke", hNum)
-    pESP[v] = {Main = container, Bar = bar, HealthNum = hNum, Stroke = stroke}
+    local mainFrame = Instance.new("Frame", container); mainFrame.Size = UDim2.new(1, 0, 1, 0); mainFrame.BackgroundTransparency = 1; local stroke = Instance.new("UIStroke", mainFrame); stroke.Thickness = 2
+    local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 15); name.Position = UDim2.new(0, 0, 0, -18)
+    local healthNum = Instance.new("TextLabel", container); healthNum.Size = UDim2.new(0, 40, 0, 15); healthNum.Position = UDim2.new(0, -45, 0, -5)
+    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -8, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0)
+    local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0)
+    
+    local function style(t)
+        t.BackgroundTransparency, t.TextColor3, t.Font, t.TextScaled = 1, Color3.new(1, 1, 1), Enum.Font.RobotoMono, true
+        Instance.new("UIStroke", t)
+    end
+    style(name); style(healthNum)
+    pESP[v] = {Main = container, Name = name, HealthNum = healthNum, Bar = bar, Stroke = stroke}
     return pESP[v]
 end
 
-P.PlayerRemoving:Connect(function(p)
-    if pESP[p] then pESP[p].Main:Destroy(); pESP[p] = nil end
-end)
+P.PlayerRemoving:Connect(function(p) if pESP[p] then pESP[p].Main:Destroy(); pESP[p] = nil end end)
 
--- 壁チェック関数
-local function isVisible(targetPart)
-    if not config.wallCheck then return true end
-    local C = workspace.CurrentCamera
-    local char = targetPart.Parent
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LP.Character, C}
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    
-    local result = workspace:Raycast(C.CFrame.Position, (targetPart.Position - C.CFrame.Position), rayParams)
-    return result == nil or result.Instance:IsDescendantOf(char)
-end
-
-local function getBestTarget()
-    local target, near = nil, config.pcFov
-    local C = workspace.CurrentCamera
-    for _, v in pairs(P:GetPlayers()) do
-        if v == LP or (v.Team ~= nil and LP.Team ~= nil and v.Team == LP.Team) then continue end
-        local head = v.Character and v.Character:FindFirstChild("Head")
-        local hum = v.Character and v.Character:FindFirstChildWhichIsA("Humanoid")
-        if head and hum and hum.Health > 0 then
-            local dist = (C.CFrame.Position - head.Position).Magnitude
-            if dist > config.maxDist then continue end -- 遠すぎたら無視
-            
-            local pos, vis = C:WorldToViewportPoint(head.Position)
-            if vis and isVisible(head) then
-                local d = (Vector2.new(pos.X, pos.Y) - Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2)).Magnitude
-                if d < near then near = d; target = head end
-            end
-        end
-    end
-    return target
-end
-
-local stickyTarget = nil
-
+-- --- メインエンジン ---
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
-    if not C then return end
-    
-    -- ESP Loop
+    if not C or not LP.Character then return end
+    local center = Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2)
+    local targetHead, nearestDist = nil, config.pcFov
+    local fireAllowed = false
+
     for _, v in pairs(P:GetPlayers()) do
-        if v == LP or (v.Team ~= nil and LP.Team ~= nil and v.Team == LP.Team) then 
+        if not isEnemy(v) then 
             if pESP[v] then pESP[v].Main.Visible = false end continue 
         end
 
-        local head = v.Character and v.Character:FindFirstChild("Head")
-        local hum = v.Character and v.Character:FindFirstChildWhichIsA("Humanoid")
-        
+        local char = v.Character
+        local head = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart"))
+        local hum = char and char:FindFirstChildWhichIsA("Humanoid")
+
         if head and hum and hum.Health > 0 then
-            local dist = (C.CFrame.Position - head.Position).Magnitude
-            local pos, vis = C:WorldToViewportPoint(head.Position)
+            local dist = (head.Position - C.CFrame.Position).Magnitude
+            local pos, onScreen = C:WorldToViewportPoint(head.Position)
             
-            -- 距離フィルター & 壁チェック & 画面内
-            local canShow = (not config.hideUI) and (dist <= config.maxDist) and vis and isVisible(head)
+            -- 壁判定
+            local rayParams = RaycastParams.new()
+            rayParams.FilterDescendantsInstances = {LP.Character, char, C}
+            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+            local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
+            local isVisible = not result
+
+            -- 条件：画面内 & 距離以内 & (壁裏じゃない or フィルターOFF)
+            local shouldShow = onScreen and dist <= config.maxDistance and (not config.hideUI) and isVisible
             
-            if canShow then
+            if shouldShow then
                 local esp = pESP[v] or createESP(v)
                 if esp then
                     esp.Main.Visible = true
-                    local hS = 2300/dist; local wS = hS * 0.7
-                    esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/2); esp.Main.Size = UDim2.new(0, wS, 0, hS)
-                    esp.HealthNum.Text = math.floor(hum.Health)
+                    local h = math.clamp(1000/pos.Z, 10, 500); local w = h * 0.7
+                    esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/2); esp.Main.Size = UDim2.new(0, w, 0, h)
+                    esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health)
+                    esp.Stroke.Color = Color3.new(0, 1, 0)
+                    esp.Bar.BackgroundColor3 = Color3.new(0, 1, 0)
                     esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
                 end
             elseif pESP[v] then pESP[v].Main.Visible = false end
+
+            -- エイムターゲット選定 (壁裏は狙わない)
+            if onScreen and isVisible and dist <= config.maxDistance then
+                local mouseDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                if mouseDist < nearestDist then
+                    targetHead = head
+                    nearestDist = mouseDist
+                end
+                -- オートファイヤ判定
+                if mouseDist < 100 then fireAllowed = true end
+            end
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    -- Aim & Fire
-    local currentTarget = nil
-    if config.aimbot then
-        if config.aimMode == "STICKY" then
-            if not stickyTarget or not stickyTarget.Parent or stickyTarget.Parent:FindFirstChildWhichIsA("Humanoid").Health <= 0 or (C.CFrame.Position - stickyTarget.Position).Magnitude > config.maxDist or not isVisible(stickyTarget) then
-                stickyTarget = getBestTarget()
-            end
-            currentTarget = stickyTarget
-        else
-            stickyTarget = nil
-            if U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then currentTarget = getBestTarget() end
+    -- エイム実行 (右クリック中のみ吸い付き)
+    if targetHead and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local pos, _ = C:WorldToViewportPoint(targetHead.Position)
+        if mousemoverel then
+            mousemoverel((pos.X - center.X) * config.smooth, (pos.Y - center.Y) * config.smooth)
         end
-
-        if currentTarget then
-            C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, currentTarget.Position), config.smooth)
-        end
-    else
-        stickyTarget = nil
     end
 
-    if config.autoFire and currentTarget then
-        local p, vis = C:WorldToViewportPoint(currentTarget.Position)
-        if vis and (Vector2.new(p.X, p.Y) - Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2)).Magnitude < 30 then
-            if mouse1press then mouse1press(); task.wait(0.01); mouse1release() end
-        end
+    -- 発射
+    if config.autoFire and fireAllowed and mouse1press then
+        mouse1press(); task.wait(0.01); mouse1release()
     end
 end)
 
