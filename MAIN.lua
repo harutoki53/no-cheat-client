@@ -1,4 +1,3 @@
--- Harutoki Ultimate: ESP Fixed & Elite Edition
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -21,7 +20,7 @@ local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 gui.Name = "HarutokiUltimate"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
-gui.DisplayOrder = 9999
+gui.DisplayOrder = 999 -- 最前面
 
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
@@ -40,13 +39,8 @@ local function createMenuBtn(txt, y)
 end
 
 local btns = {
-    aim = createMenuBtn("AIMBOT", 50),
-    mode = createMenuBtn("MODE: LOCK", 95),
-    fire = createMenuBtn("AUTO FIRE", 140),
-    wall = createMenuBtn("FILTER", 185),
-    esp = createMenuBtn("ESP FIL", 230),
-    hide = createMenuBtn("HIDE UI", 275),
-    close = createMenuBtn("CLOSE", 320)
+    aim = createMenuBtn("AIMBOT", 50), mode = createMenuBtn("MODE: LOCK", 95), fire = createMenuBtn("AUTO FIRE", 140),
+    wall = createMenuBtn("FILTER", 185), esp = createMenuBtn("ESP FIL", 230), hide = createMenuBtn("HIDE UI", 275), close = createMenuBtn("CLOSE", 320)
 }
 
 local function updateUI()
@@ -72,44 +66,32 @@ local actions = {
 for k, v in pairs(btns) do if k ~= "close" then v.MouseButton1Click:Connect(function() actions[k]() end) end end
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- [判定ロジック] ---
-local function canSeePlayer(targetChar)
-    if not targetChar then return false end
-    local cam = workspace.CurrentCamera
-    local parts = {targetChar:FindFirstChild("Head"), targetChar:FindFirstChild("HumanoidRootPart")}
-    local params = RaycastParams.new(); params.FilterDescendantsInstances = {LP.Character, targetChar, cam}; params.FilterType = Enum.RaycastFilterType.Exclude
-    for _, p in pairs(parts) do
-        if p then
-            local res = workspace:Raycast(cam.CFrame.Position, (p.Position - cam.CFrame.Position), params)
-            if not res then return true end
-        end
-    end
-    return false
-end
-
--- --- ESP再構築 ---
+-- --- ESP再構築 (ZIndexとAnchorPointを徹底修正) ---
 local pESP = {}
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
+    container.ZIndex = 10
     
-    -- メイン枠
-    local boxFrame = Instance.new("Frame", container); boxFrame.Size = UDim2.new(1, 0, 1, 0); boxFrame.BackgroundTransparency = 1
-    local stroke = Instance.new("UIStroke", boxFrame); stroke.Thickness = 1.5; stroke.Color = Color3.new(0, 1, 0)
+    -- メイン枠 (Strokeを内側に)
+    local box = Instance.new("Frame", container); box.Size = UDim2.new(1, 0, 1, 0); box.BackgroundTransparency = 1
+    local stroke = Instance.new("UIStroke", box); stroke.Thickness = 2; stroke.Color = Color3.new(0, 1, 0)
     
-    -- 名前
-    local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 14); name.Position = UDim2.new(0, 0, 0, -18)
-    name.BackgroundTransparency = 1; name.TextColor3 = Color3.new(1, 1, 1); name.Font = Enum.Font.RobotoMono; name.TextScaled = true; Instance.new("UIStroke", name)
-    
-    -- HP数値 (枠の左側)
-    local healthNum = Instance.new("TextLabel", container); healthNum.Size = UDim2.new(0, 35, 0, 14); healthNum.Position = UDim2.new(0, -42, 0, 0)
-    healthNum.BackgroundTransparency = 1; healthNum.TextColor3 = Color3.new(1, 1, 1); healthNum.Font = Enum.Font.RobotoMono; healthNum.TextScaled = true; Instance.new("UIStroke", healthNum)
-    
-    -- HPバー
-    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 3, 1, 0); barBG.Position = UDim2.new(0, -6, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0)
+    -- 体力バー (左側に配置)
+    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -7, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0)
     local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0); bar.BorderSizePixel = 0
     
-    -- アバター
-    local ava = Instance.new("ImageLabel", container); ava.Size = UDim2.new(0, 25, 0, 25); ava.Position = UDim2.new(0.5, -12, 0.5, -12); ava.BackgroundTransparency = 1; ava.ZIndex = 0
+    -- 体力数値 (バーのさらに左)
+    local healthNum = Instance.new("TextLabel", container); healthNum.Size = UDim2.new(0, 40, 0, 15); healthNum.Position = UDim2.new(0, -50, 0.5, -7.5)
+    healthNum.BackgroundTransparency = 1; healthNum.TextColor3 = Color3.new(1,1,1); healthNum.Font = Enum.Font.RobotoMono; healthNum.TextScaled = true
+    Instance.new("UIStroke", healthNum)
+
+    -- 名前 (上に配置)
+    local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 15); name.Position = UDim2.new(0, 0, 0, -20)
+    name.BackgroundTransparency = 1; name.TextColor3 = Color3.new(1,1,1); name.Font = Enum.Font.RobotoMono; name.TextScaled = true
+    Instance.new("UIStroke", name)
+
+    -- アバター (枠の中に薄く表示)
+    local ava = Instance.new("ImageLabel", container); ava.Size = UDim2.new(0.5, 0, 0.5, 0); ava.Position = UDim2.new(0.25, 0, 0.25, 0); ava.BackgroundTransparency = 1; ava.ImageTransparency = 0.3; ava.ZIndex = -1
 
     pESP[v] = {Main = container, Name = name, HealthNum = healthNum, Ava = ava, Bar = bar, Stroke = stroke}
     return pESP[v]
@@ -132,22 +114,35 @@ R.RenderStepped:Connect(function()
 
     for _, v in pairs(P:GetPlayers()) do
         if v == LP or (LP.Team and v.Team == LP.Team) then if pESP[v] then pESP[v].Main.Visible = false end continue end
-        local ch = v.Character; local head = ch and ch:FindFirstChild("Head")
+        local ch = v.Character; local root = ch and ch:FindFirstChild("HumanoidRootPart")
         local hum = ch and ch:FindFirstChildWhichIsA("Humanoid")
         
-        if head and hum and hum.Health > 0 then
-            local pos, vis = C:WorldToViewportPoint(head.Position)
-            local canSee = canSeePlayer(ch)
+        if root and hum and hum.Health > 0 then
+            local pos, vis = C:WorldToViewportPoint(root.Position)
+            
+            -- 壁判定
+            local rayParams = RaycastParams.new(); rayParams.FilterDescendantsInstances = {LP.Character, ch, C}; rayParams.FilterType = Enum.RaycastFilterType.Exclude
+            local res = workspace:Raycast(C.CFrame.Position, (root.Position - C.CFrame.Position), rayParams)
+            local canSee = not res
             
             if vis then
                 local esp = pESP[v] or createESP(v)
                 local show = (not config.hideUI) and ((not config.espFilter) or canSee)
                 esp.Main.Visible = show
+                
                 if show then
-                    -- 距離に応じて枠のサイズを調整
-                    local hS = math.clamp(2000/pos.Z, 10, 800); local wS = hS * 0.65
-                    esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/4); esp.Main.Size = UDim2.new(0, wS, 0, hS)
+                    -- ズレ修正：BoundingBox（全体を囲むサイズ）を取得
+                    local size = ch:GetExtentsSize()
+                    local top, _ = C:WorldToViewportPoint((root.CFrame * CFrame.new(0, size.Y/2, 0)).Position)
+                    local bottom, _ = C:WorldToViewportPoint((root.CFrame * CFrame.new(0, -size.Y/2, 0)).Position)
+                    local hS = math.abs(top.Y - bottom.Y)
+                    local wS = hS * 0.6
                     
+                    -- 位置とサイズを完璧にフィット
+                    esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/2)
+                    esp.Main.Size = UDim2.new(0, wS, 0, hS)
+                    
+                    -- 情報の更新
                     esp.Name.Text = v.DisplayName
                     esp.HealthNum.Text = math.floor(hum.Health)
                     esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
@@ -161,9 +156,7 @@ R.RenderStepped:Connect(function()
 
                 if (not config.wallCheck or canSee) then
                     local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if d < near then
-                        target = head; near = d 
-                    end
+                    if d < near then target = ch:FindFirstChild("Head") or root; near = d end
                 end
                 if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 100 then fireOk = true end
             elseif pESP[v] then pESP[v].Main.Visible = false end
