@@ -11,8 +11,9 @@ local config = {
     espFilter = true,
     smooth = 0.2,
     pcFov = 500,
+    maxDist = 400, -- ★これより遠い敵には吸い付かない・ESP出さない
     menuOpen = false,
-    hideUI = true -- デフォルトON
+    hideUI = true  -- デフォルトON（実行時ESP非表示）
 }
 
 -- --- GUI ---
@@ -41,7 +42,7 @@ local btns = {
     fire = createMenuBtn("FIRE: OFF", 140),
     wall = createMenuBtn("FILTER: ON", 185),
     esp = createMenuBtn("ESP FIL: ON", 230),
-    hide = createMenuBtn("HIDE UI: ON", 275), -- ここをONに修正
+    hide = createMenuBtn("HIDE UI: ON", 275),
     close = createMenuBtn("CLOSE", 320)
 }
 
@@ -68,7 +69,6 @@ local actions = {
 for k, v in pairs(btns) do if k ~= "close" then v.MouseButton1Click:Connect(function() actions[k]() end) end end
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- キー判定 ---
 U.InputBegan:Connect(function(input, processed)
     if processed then return end
     local key = input.KeyCode
@@ -82,7 +82,7 @@ U.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- --- ESP構築 ---
+-- --- ESP & クリーンアップ ---
 local pESP = {}
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false; container.ZIndex = 5
@@ -96,7 +96,6 @@ local function createESP(v)
     return pESP[v]
 end
 
--- --- ★抜けたやつのESPを消す処理 ---
 P.PlayerRemoving:Connect(function(player)
     if pESP[player] then
         pESP[player].Main:Destroy()
@@ -104,8 +103,21 @@ P.PlayerRemoving:Connect(function(player)
     end
 end)
 
+-- --- 確率用関数 ---
+local function getTargetPos(char, camCF)
+    local chance = math.random(1, 100)
+    if chance <= 50 then
+        return char.Head.Position -- 50% 頭
+    elseif chance <= 90 then
+        return (char:FindFirstChild("UpperTorso") or char:FindFirstChild("HumanoidRootPart")).Position -- 40% 胴体
+    else
+        return char.Head.Position + (camCF.RightVector * 3) -- 10% 真横
+    end
+end
+
 -- --- メインエンジン ---
-local currentTarget = nil
+local currentTargetChar = nil
+local currentAimPoint = nil
 
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
@@ -120,18 +132,28 @@ R.RenderStepped:Connect(function()
         local hum = ch and ch:FindFirstChildWhichIsA("Humanoid")
         
         if head and hum and hum.Health > 0 then
+            local dist = (C.CFrame.Position - head.Position).Magnitude
+            
+            -- ★距離制限（遠すぎる敵は無視）
+            if dist > config.maxDist then
+                if pESP[v] then pESP[v].Main.Visible = false end
+                continue
+            end
+
             local pos, vis = C:WorldToViewportPoint(head.Position)
-            local rayParams = RaycastParams.new(); rayParams.FilterDescendantsInstances = {LP.Character, ch, C}; rayParams.FilterType = Enum.RaycastFilterType.Exclude
-            local res = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position), rayParams)
-            local canSee = (not res) and vis
+            local canSee = vis
+            if config.wallCheck then
+                local res = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position), RaycastParams.new())
+                if res and not res.Instance:IsDescendantOf(ch) then canSee = false end
+            end
 
             if vis then
                 local esp = pESP[v] or createESP(v)
+                -- ★HIDE設定がONなら絶対表示しない
                 local show = (not config.hideUI) and ((not config.espFilter) or canSee)
                 esp.Main.Visible = show
                 if show then
-                    local dist = (C.CFrame.Position - head.Position).Magnitude
-                    local hS = math.clamp(2300/dist, 10, 800); local wS = hS * 0.7
+                    local hS = 2300/dist; local wS = hS * 0.7
                     esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/2); esp.Main.Size = UDim2.new(0, wS, 0, hS)
                     esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health)
                     local col = canSee and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
@@ -140,23 +162,32 @@ R.RenderStepped:Connect(function()
 
                 if canSee or (not config.wallCheck and vis) then
                     local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if d < near then target = head; near = d end
+                    if d < near then target = ch; near = d end
                 end
                 if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 120 then fireOk = true end
             elseif pESP[v] then pESP[v].Main.Visible = false end
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    -- エイム
+    -- エイム（リアルタイム確率計算）
     if config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        if config.aimMode == "STICKY" then
-            if not currentTarget or not currentTarget.Parent or currentTarget.Parent:FindFirstChildWhichIsA("Humanoid").Health <= 0 then currentTarget = target end
-        else currentTarget = target end
-        if currentTarget then
-            local p, vis = C:WorldToViewportPoint(currentTarget.Position)
-            if vis and mousemoverel then mousemoverel((p.X - center.X) * config.smooth, (p.Y - center.Y) * config.smooth) end
+        if target then
+            if currentTargetChar ~= target then
+                currentTargetChar = target
+                currentAimPoint = getTargetPos(target, C.CFrame) -- ターゲット捕捉時に確率で部位決定
+            end
+            
+            if currentAimPoint then
+                local p, vis = C:WorldToViewportPoint(currentAimPoint)
+                if vis and mousemoverel then
+                    mousemoverel((p.X - center.X) * config.smooth, (p.Y - center.Y) * config.smooth)
+                end
+            end
         end
-    else currentTarget = nil end
+    else
+        currentTargetChar = nil
+        currentAimPoint = nil
+    end
 
     if config.autoFire and fireOk and mouse1press then mouse1press(); task.wait(0.01); mouse1release() end
 end)
