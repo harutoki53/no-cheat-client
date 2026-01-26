@@ -12,7 +12,7 @@ local config = {
     smooth = 0.2,
     pcFov = 500,
     menuOpen = false,
-    hideUI = true 
+    hideUI = true -- デフォルトON
 }
 
 -- --- GUI ---
@@ -41,7 +41,7 @@ local btns = {
     fire = createMenuBtn("FIRE: OFF", 140),
     wall = createMenuBtn("FILTER: ON", 185),
     esp = createMenuBtn("ESP FIL: ON", 230),
-    hide = createMenuBtn("HIDE UI: OFF", 275),
+    hide = createMenuBtn("HIDE UI: ON", 275), -- ここをONに修正
     close = createMenuBtn("CLOSE", 320)
 }
 
@@ -65,14 +65,12 @@ local actions = {
     menu = function() config.menuOpen = not config.menuOpen; updateUI() end
 }
 
--- ボタンクリック
 for k, v in pairs(btns) do if k ~= "close" then v.MouseButton1Click:Connect(function() actions[k]() end) end end
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- ★キー判定（ここが修正ポイント） ---
+-- --- キー判定 ---
 U.InputBegan:Connect(function(input, processed)
-    if processed then return end -- チャット中などは反応させない
-    
+    if processed then return end
     local key = input.KeyCode
     if key == Enum.KeyCode.RightShift then actions.menu()
     elseif key == Enum.KeyCode.J then actions.aim()
@@ -97,6 +95,14 @@ local function createESP(v)
     pESP[v] = {Main = container, Name = name, HealthNum = hNum, Bar = bar, Stroke = stroke}
     return pESP[v]
 end
+
+-- --- ★抜けたやつのESPを消す処理 ---
+P.PlayerRemoving:Connect(function(player)
+    if pESP[player] then
+        pESP[player].Main:Destroy()
+        pESP[player] = nil
+    end
+end)
 
 -- --- メインエンジン ---
 local currentTarget = nil
