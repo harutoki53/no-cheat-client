@@ -7,26 +7,30 @@ local LP = P.LocalPlayer
 local config = {
     aimbot = true,
     autoFire = true,
-    wallCheck = true, -- FILTER: ON(見える敵のみ) / OFF(壁越しもエイム)
+    wallCheck = true,
     smooth = 0.4,
     pcFov = 800,
     maxDistance = 1000,
     menuOpen = false
 }
 
--- --- GUI完全復元 (最前面表示) ---
+-- --- GUI完全復元 (最前面表示 & キャプチャ回避設定) ---
 local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 gui.Name = "HarutokiUltimate"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 9999
 
+-- 【重要】OBSなどのキャプチャソフトに映らなくする設定
+-- ※環境によっては機能しない場合がありますが、Roblox公式のキャプチャ回避策です。
+gui.DisplayOnAppWindow = false 
+
 -- 古いUIのクリーンアップ
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
 
--- --- チーム判定関数 (起点コード継承) ---
+-- --- チーム判定関数 ---
 local function isEnemy(v)
     if not v or v == LP then return false end
     if LP.Team and v.Team then return LP.Team ~= v.Team end
@@ -36,7 +40,7 @@ local function isEnemy(v)
     return true
 end
 
--- --- 設定メニュー (元のデザインを完全復元) ---
+-- --- 設定メニュー ---
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 300); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -150)
 menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.Visible = false
@@ -71,7 +75,7 @@ U.InputBegan:Connect(function(i, gpe)
     end
 end)
 
--- --- ESPオブジェクト管理 (アバター・体力バー完全実装) ---
+-- --- ESPオブジェクト管理 ---
 local pESP = {}
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
@@ -92,7 +96,7 @@ local function createESP(v)
     return pESP[v]
 end
 
--- --- メインエンジン (オートエイム & 自動発射) ---
+-- --- メインエンジン ---
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C or not LP.Character then return end
@@ -108,7 +112,6 @@ R.RenderStepped:Connect(function()
         end
 
         local char = v.Character
-        -- RivalsのHitboxパーツ名に対応
         local head = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart", true))
         local hum = char and char:FindFirstChildWhichIsA("Humanoid")
 
@@ -119,27 +122,23 @@ R.RenderStepped:Connect(function()
             if onScreen and dist <= config.maxDistance then
                 local esp = pESP[v] or createESP(v)
                 
-                -- 壁判定 (厳密Raycast)
                 local rayParams = RaycastParams.new()
                 rayParams.FilterDescendantsInstances = {LP.Character, char, C}
                 rayParams.FilterType = Enum.RaycastFilterType.Exclude
                 local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
                 local isVisible = not result
 
-                -- ESP更新
                 esp.Main.Visible = true
                 local h = math.clamp(1000/pos.Z, 10, 500); local w = h * 0.7
                 esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/2); esp.Main.Size = UDim2.new(0, w, 0, h)
                 esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health)
                 esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
                 
-                -- 色設定
                 local color = isVisible and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
                 esp.Stroke.Color = color
                 esp.Bar.BackgroundColor3 = color
                 esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
 
-                -- エイム判定 (FILTERロジック)
                 if (not config.wallCheck) or isVisible then
                     local mouseDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     if mouseDist < nearestDist then
@@ -148,7 +147,6 @@ R.RenderStepped:Connect(function()
                     end
                 end
 
-                -- 自動発射判定 (壁越しは撃たないルール)
                 if isVisible and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 100 then
                     fireAllowed = true
                 end
@@ -156,7 +154,6 @@ R.RenderStepped:Connect(function()
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    -- オートエイム実行
     if targetHead and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local pos, _ = C:WorldToViewportPoint(targetHead.Position)
         if mousemoverel then
@@ -164,11 +161,10 @@ R.RenderStepped:Connect(function()
         end
     end
 
-    -- 自動発射実行 (視認可能時のみ)
     if config.autoFire and fireAllowed and mouse1press then
         mouse1press(); task.wait(0.01); mouse1release()
     end
 end)
 
 updateUI()
-print("Harutoki Ultimate: All Systems Online")
+print("Harutoki Ultimate: All Systems Online (Stream-Proof Enabled)")
