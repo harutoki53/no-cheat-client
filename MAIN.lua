@@ -8,17 +8,22 @@ local config = {
     aimMode = "STICKY", 
     wallCheck = true,
     espFilter = true,
-    smooth = 0.3,      -- Direct CFrameなので0.05〜0.2で十分滑らかになります
+    smooth = 0.1,      
     pcFov = 400,
     maxDist = 1000,
-    menuOpen = false,
-    hideUI = false 
+    menuOpen = false,  -- 初期は非表示
+    hideUI = true      -- 初期は非表示
 }
 
--- --- GUI & Menu ---
+-- --- GUI ---
 local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
-gui.Name = "HarutokiUltimate_Direct"
+gui.Name = "HarutokiUltimate_Final_V2"
 gui.IgnoreGuiInset = true; gui.ResetOnSpawn = false
+
+-- 重複削除
+for _, v in pairs(LP.PlayerGui:GetChildren()) do
+    if v.Name:find("HarutokiUltimate") and v ~= gui then v:Destroy() end
+end
 
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 400); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -200)
@@ -86,7 +91,14 @@ local function createESP(v)
     return pESP[v]
 end
 
--- --- 目標選定 ---
+-- ★ 抜けた人のESPを削除する
+P.PlayerRemoving:Connect(function(p)
+    if pESP[p] then
+        pESP[p].Main:Destroy()
+        pESP[p] = nil
+    end
+end)
+
 local function getBestTarget()
     local target, near = nil, config.pcFov
     local C = workspace.CurrentCamera
@@ -115,15 +127,21 @@ R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C then return end
     
-    -- ESP Loop
+    -- ESP更新
     for _, v in pairs(P:GetPlayers()) do
         local esp = pESP[v]
-        if v == LP or (v.Team ~= nil and v.Team == LP.Team) then if esp then esp.Main.Visible = false end continue end
+        -- 味方はスキップ
+        if v == LP or (v.Team ~= nil and v.Team == LP.Team) then 
+            if esp then esp.Main.Visible = false end 
+            continue 
+        end
+
         local head = v.Character and v.Character:FindFirstChild("Head")
         local hum = v.Character and v.Character:FindFirstChildWhichIsA("Humanoid")
         
         if head and hum and hum.Health > 0 then
             local pos, vis = C:WorldToViewportPoint(head.Position)
+            -- 非表示設定（config.hideUI）がONなら絶対に表示しない
             if vis and not config.hideUI then
                 esp = esp or createESP(v)
                 esp.Main.Visible = true
@@ -136,7 +154,7 @@ R.RenderStepped:Connect(function()
         elseif esp then esp.Main.Visible = false end
     end
 
-    -- --- エイム実行 (CFrame Direct) ---
+    -- --- エイム実行 ---
     if config.aimbot then
         local target = nil
         if config.aimMode == "STICKY" then
@@ -150,7 +168,6 @@ R.RenderStepped:Connect(function()
         end
 
         if target then
-            -- マウスを動かすのではなく、カメラそのものを敵に向ける
             local targetPos = target.Position
             C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, targetPos), config.smooth)
         end
