@@ -11,16 +11,16 @@ local config = {
     smooth = 0.1,      
     pcFov = 400,
     maxDist = 1000,
-    menuOpen = false,  -- 初期は非表示
-    hideUI = true      -- 初期は非表示
+    menuOpen = false,
+    hideUI = true      -- 初期状態は非表示
 }
 
 -- --- GUI ---
 local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
-gui.Name = "HarutokiUltimate_Final_V2"
+gui.Name = "HarutokiUltimate_V4_Final"
 gui.IgnoreGuiInset = true; gui.ResetOnSpawn = false
 
--- 重複削除
+-- 古いGUIを掃除
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name:find("HarutokiUltimate") and v ~= gui then v:Destroy() end
 end
@@ -81,29 +81,30 @@ end)
 -- --- ESP ---
 local pESP = {}
 local function createESP(v)
+    -- ★自分には絶対に作らない
+    if v == LP or config.hideUI then return nil end 
+    
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
     local box = Instance.new("Frame", container); box.Size = UDim2.new(1, 0, 1, 0); box.BackgroundTransparency = 1
     local stroke = Instance.new("UIStroke", box); stroke.Thickness = 2; stroke.Color = Color3.new(0, 1, 0)
     local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -7, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0); barBG.BorderSizePixel = 0
     local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0); bar.BackgroundColor3 = Color3.new(0, 1, 0); bar.BorderSizePixel = 0
     local hNum = Instance.new("TextLabel", container); hNum.Size = UDim2.new(0, 40, 0, 14); hNum.Position = UDim2.new(0, -50, 0.5, -7); hNum.BackgroundTransparency = 1; hNum.TextColor3 = Color3.new(1,1,1); hNum.Font = Enum.Font.RobotoMono; hNum.TextScaled = true; hNum.TextXAlignment = Enum.TextXAlignment.Right; Instance.new("UIStroke", hNum)
+    
     pESP[v] = {Main = container, Bar = bar, HealthNum = hNum, Stroke = stroke}
     return pESP[v]
 end
 
--- ★ 抜けた人のESPを削除する
 P.PlayerRemoving:Connect(function(p)
-    if pESP[p] then
-        pESP[p].Main:Destroy()
-        pESP[p] = nil
-    end
+    if pESP[p] then pESP[p].Main:Destroy(); pESP[p] = nil end
 end)
 
 local function getBestTarget()
     local target, near = nil, config.pcFov
     local C = workspace.CurrentCamera
     for _, v in pairs(P:GetPlayers()) do
-        if v == LP or (v.Team ~= nil and v.Team == LP.Team) then continue end
+        -- ★ 自分と味方は除外
+        if v == LP or (v.Team ~= nil and LP.Team ~= nil and v.Team == LP.Team) then continue end
         local head = v.Character and v.Character:FindFirstChild("Head")
         local hum = v.Character and v.Character:FindFirstChildWhichIsA("Humanoid")
         if head and hum and hum.Health > 0 then
@@ -127,12 +128,16 @@ R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C then return end
     
-    -- ESP更新
     for _, v in pairs(P:GetPlayers()) do
-        local esp = pESP[v]
-        -- 味方はスキップ
-        if v == LP or (v.Team ~= nil and v.Team == LP.Team) then 
-            if esp then esp.Main.Visible = false end 
+        -- ★ 自分自身は最優先でスキップ
+        if v == LP then 
+            if pESP[v] then pESP[v].Main:Destroy(); pESP[v] = nil end
+            continue 
+        end
+        
+        -- ★ 味方も表示しない
+        if (v.Team ~= nil and LP.Team ~= nil and v.Team == LP.Team) then 
+            if pESP[v] then pESP[v].Main.Visible = false end 
             continue 
         end
 
@@ -141,20 +146,20 @@ R.RenderStepped:Connect(function()
         
         if head and hum and hum.Health > 0 then
             local pos, vis = C:WorldToViewportPoint(head.Position)
-            -- 非表示設定（config.hideUI）がONなら絶対に表示しない
             if vis and not config.hideUI then
-                esp = esp or createESP(v)
-                esp.Main.Visible = true
-                local dist = (C.CFrame.Position - head.Position).Magnitude
-                local hS = 2300/dist; local wS = hS * 0.7
-                esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/2); esp.Main.Size = UDim2.new(0, wS, 0, hS)
-                esp.HealthNum.Text = math.floor(hum.Health)
-                esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
-            elseif esp then esp.Main.Visible = false end
-        elseif esp then esp.Main.Visible = false end
+                local esp = pESP[v] or createESP(v)
+                if esp then
+                    esp.Main.Visible = true
+                    local dist = (C.CFrame.Position - head.Position).Magnitude
+                    local hS = 2300/dist; local wS = hS * 0.7
+                    esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/2); esp.Main.Size = UDim2.new(0, wS, 0, hS)
+                    esp.HealthNum.Text = math.floor(hum.Health)
+                    esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
+                end
+            elseif pESP[v] then pESP[v].Main.Visible = false end
+        elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    -- --- エイム実行 ---
     if config.aimbot then
         local target = nil
         if config.aimMode == "STICKY" then
@@ -168,8 +173,7 @@ R.RenderStepped:Connect(function()
         end
 
         if target then
-            local targetPos = target.Position
-            C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, targetPos), config.smooth)
+            C.CFrame = C.CFrame:Lerp(CFrame.new(C.CFrame.Position, target.Position), config.smooth)
         end
     else
         stickyTarget = nil
