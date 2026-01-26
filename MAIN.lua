@@ -5,11 +5,11 @@ local LP = P.LocalPlayer
 
 local config = {
     aimbot = false,
-    aimMode = "STICKY", -- STICKY: 自動 / LOCK: 右クリック
+    aimMode = "STICKY", 
     autoFire = false,
     wallCheck = true,
     espFilter = true,
-    smooth = 1,        -- 最速設定
+    smooth = 0.8,      -- 1だと飛びすぎる場合があるので0.8で超高速化
     pcFov = 500,
     maxDist = 600,
     menuOpen = false,
@@ -82,16 +82,27 @@ U.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- --- ESP & クリーンアップ ---
+-- --- ESP (体力バー復活) ---
 local pESP = {}
-P.PlayerRemoving:Connect(function(p) if pESP[p] then pESP[p].Main:Destroy(); pESP[p] = nil end end)
-
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
-    local stroke = Instance.new("UIStroke", Instance.new("Frame", container)); stroke.Thickness = 2; stroke.Parent.Size = UDim2.new(1,0,1,0); stroke.Parent.BackgroundTransparency = 1
-    pESP[v] = {Main = container, Stroke = stroke}
+    local box = Instance.new("Frame", container); box.Size = UDim2.new(1, 0, 1, 0); box.BackgroundTransparency = 1
+    local stroke = Instance.new("UIStroke", box); stroke.Thickness = 2; stroke.Color = Color3.new(0, 1, 0)
+    
+    -- 左側の体力バー背景
+    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -6, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0); barBG.BorderSizePixel = 0
+    -- 体力バー
+    local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0); bar.BackgroundColor3 = Color3.new(0, 1, 0); bar.BorderSizePixel = 0
+    -- 体力数値
+    local hNum = Instance.new("TextLabel", container); hNum.Size = UDim2.new(0, 40, 0, 14); hNum.Position = UDim2.new(0, -48, 0.5, -7); hNum.BackgroundTransparency = 1; hNum.TextColor3 = Color3.new(1,1,1); hNum.Font = Enum.Font.RobotoMono; hNum.TextScaled = true; hNum.TextXAlignment = Enum.TextXAlignment.Right; Instance.new("UIStroke", hNum)
+    -- 名前
+    local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 14); name.Position = UDim2.new(0, 0, 0, -16); name.BackgroundTransparency = 1; name.TextColor3 = Color3.new(1,1,1); name.Font = Enum.Font.RobotoMono; name.TextScaled = true; Instance.new("UIStroke", name)
+    
+    pESP[v] = {Main = container, Bar = bar, HealthNum = hNum, Name = name, Stroke = stroke}
     return pESP[v]
 end
+
+P.PlayerRemoving:Connect(function(p) if pESP[p] then pESP[p].Main:Destroy(); pESP[p] = nil end end)
 
 -- --- メインエンジン ---
 local stickyTarget = nil
@@ -119,6 +130,7 @@ R.RenderStepped:Connect(function()
                 if res and not res.Instance:IsDescendantOf(ch) then canSee = false end
             end
 
+            -- ESP表示
             if vis then
                 local esp = pESP[v] or createESP(v)
                 local show = (not config.hideUI) and (not config.espFilter or canSee)
@@ -126,8 +138,13 @@ R.RenderStepped:Connect(function()
                 if show then
                     local hS = 2300/dist; local wS = hS * 0.7
                     esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/2); esp.Main.Size = UDim2.new(0, wS, 0, hS)
-                    esp.Stroke.Color = canSee and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+                    esp.Name.Text = v.DisplayName
+                    esp.HealthNum.Text = math.floor(hum.Health)
+                    esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
+                    local col = canSee and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+                    esp.Stroke.Color = col; esp.Bar.BackgroundColor3 = col
                 end
+                
                 if canSee or (not config.wallCheck and vis) then
                     local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     if d < near then bestPart = head; near = d end
@@ -139,34 +156,32 @@ R.RenderStepped:Connect(function()
     -- --- エイム制御 ---
     if config.aimbot then
         local targetToAim = nil
-
         if config.aimMode == "STICKY" then
-            -- STICKY: 常にON、死ぬまで離さない
-            if not stickyTarget or not stickyTarget.Parent or stickyTarget.Parent:FindFirstChildWhichIsA("Humanoid").Health <= 0 then
-                stickyTarget = bestPart
+            -- ロック継続判定
+            if stickyTarget then
+                local h = stickyTarget.Parent:FindFirstChildWhichIsA("Humanoid")
+                local _, vis = C:WorldToViewportPoint(stickyTarget.Position)
+                if not h or h.Health <= 0 or not vis then stickyTarget = nil end
             end
+            if not stickyTarget then stickyTarget = bestPart end
             targetToAim = stickyTarget
         else
-            -- LOCK: 右クリック時のみ、一番近い敵
-            stickyTarget = nil
             if isRightClick then targetToAim = bestPart end
         end
 
-        if targetToAim then
-            local p, vis = C:WorldToViewportPoint(targetToAim.Position)
-            if vis and mousemoverel then
-                -- 100%正確に頭へ固定
-                mousemoverel((p.X - center.X), (p.Y - center.Y))
-            end
+        if targetToAim and mousemoverel then
+            local p, _ = C:WorldToViewportPoint(targetToAim.Position)
+            -- 差分を滑らかに移動（これで明後日の方向を向くのを防ぐ）
+            local moveX = (p.X - center.X) * config.smooth
+            local moveY = (p.Y - center.Y) * config.smooth
+            mousemoverel(moveX, moveY)
         end
-    else
-        stickyTarget = nil
     end
 
-    -- オートファイヤ (120px以内なら発射)
+    -- オートファイヤ
     if config.autoFire and bestPart then
-        local p, vis = C:WorldToViewportPoint(bestPart.Position)
-        if vis and (Vector2.new(p.X, p.Y) - center).Magnitude < 120 and mouse1press then
+        local p, _ = C:WorldToViewportPoint(bestPart.Position)
+        if (Vector2.new(p.X, p.Y) - center).Magnitude < 100 and mouse1press then
             mouse1press(); task.wait(0.01); mouse1release()
         end
     end
