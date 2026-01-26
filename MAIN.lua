@@ -1,4 +1,4 @@
--- Harutoki Ultimate: Full Restore & Elite ESP Edition
+-- Harutoki Ultimate: ESP Fixed & Elite Edition
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -27,7 +27,7 @@ for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
 
--- --- 設定メニュー (復元デザイン) ---
+-- --- 設定メニュー ---
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 400); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -200)
 menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.Visible = false
@@ -76,7 +76,7 @@ btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateU
 local function canSeePlayer(targetChar)
     if not targetChar then return false end
     local cam = workspace.CurrentCamera
-    local parts = {targetChar:FindFirstChild("Head"), targetChar:FindFirstChild("UpperTorso")}
+    local parts = {targetChar:FindFirstChild("Head"), targetChar:FindFirstChild("HumanoidRootPart")}
     local params = RaycastParams.new(); params.FilterDescendantsInstances = {LP.Character, targetChar, cam}; params.FilterType = Enum.RaycastFilterType.Exclude
     for _, p in pairs(parts) do
         if p then
@@ -87,23 +87,30 @@ local function canSeePlayer(targetChar)
     return false
 end
 
--- --- ESP完全復元デザイン ---
+-- --- ESP再構築 ---
 local pESP = {}
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
-    local mainFrame = Instance.new("Frame", container); mainFrame.Size = UDim2.new(1, 0, 1, 0); mainFrame.BackgroundTransparency = 1; local stroke = Instance.new("UIStroke", mainFrame); stroke.Thickness = 2
-    local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 15); name.Position = UDim2.new(0, 0, 0, -18)
-    local healthNum = Instance.new("TextLabel", container); healthNum.Size = UDim2.new(0, 40, 0, 15); healthNum.Position = UDim2.new(0, -45, 0, -5)
-    local ava = Instance.new("ImageLabel", container); ava.Size = UDim2.new(0.6, 0, 0.6, 0); ava.Position = UDim2.new(0.2, 0, 0.2, 0); ava.BackgroundTransparency = 1
-    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -8, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0)
-    local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0)
     
-    local function style(t)
-        t.BackgroundTransparency, t.TextColor3, t.Font, t.TextScaled = 1, Color3.new(1, 1, 1), Enum.Font.RobotoMono, true
-        Instance.new("UIStroke", t)
-    end
-    style(name); style(healthNum)
+    -- メイン枠
+    local boxFrame = Instance.new("Frame", container); boxFrame.Size = UDim2.new(1, 0, 1, 0); boxFrame.BackgroundTransparency = 1
+    local stroke = Instance.new("UIStroke", boxFrame); stroke.Thickness = 1.5; stroke.Color = Color3.new(0, 1, 0)
     
+    -- 名前
+    local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 14); name.Position = UDim2.new(0, 0, 0, -18)
+    name.BackgroundTransparency = 1; name.TextColor3 = Color3.new(1, 1, 1); name.Font = Enum.Font.RobotoMono; name.TextScaled = true; Instance.new("UIStroke", name)
+    
+    -- HP数値 (枠の左側)
+    local healthNum = Instance.new("TextLabel", container); healthNum.Size = UDim2.new(0, 35, 0, 14); healthNum.Position = UDim2.new(0, -42, 0, 0)
+    healthNum.BackgroundTransparency = 1; healthNum.TextColor3 = Color3.new(1, 1, 1); healthNum.Font = Enum.Font.RobotoMono; healthNum.TextScaled = true; Instance.new("UIStroke", healthNum)
+    
+    -- HPバー
+    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 3, 1, 0); barBG.Position = UDim2.new(0, -6, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0)
+    local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0); bar.BorderSizePixel = 0
+    
+    -- アバター
+    local ava = Instance.new("ImageLabel", container); ava.Size = UDim2.new(0, 25, 0, 25); ava.Position = UDim2.new(0.5, -12, 0.5, -12); ava.BackgroundTransparency = 1; ava.ZIndex = 0
+
     pESP[v] = {Main = container, Name = name, HealthNum = healthNum, Ava = ava, Bar = bar, Stroke = stroke}
     return pESP[v]
 end
@@ -137,22 +144,25 @@ R.RenderStepped:Connect(function()
                 local show = (not config.hideUI) and ((not config.espFilter) or canSee)
                 esp.Main.Visible = show
                 if show then
-                    local hS = math.clamp(1000/pos.Z, 10, 500); local wS = hS * 0.7
-                    esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/2); esp.Main.Size = UDim2.new(0, wS, 0, hS)
-                    esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health)
+                    -- 距離に応じて枠のサイズを調整
+                    local hS = math.clamp(2000/pos.Z, 10, 800); local wS = hS * 0.65
+                    esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/4); esp.Main.Size = UDim2.new(0, wS, 0, hS)
+                    
+                    esp.Name.Text = v.DisplayName
+                    esp.HealthNum.Text = math.floor(hum.Health)
                     esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
                     
                     local color = canSee and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
                     esp.Stroke.Color = color
                     esp.Bar.BackgroundColor3 = color
                     esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
+                    esp.HealthNum.TextColor3 = color
                 end
 
                 if (not config.wallCheck or canSee) then
                     local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     if d < near then
-                        target = (math.random(1, 100) <= 75) and head or ch:FindFirstChild("UpperTorso") or head
-                        near = d 
+                        target = head; near = d 
                     end
                 end
                 if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 100 then fireOk = true end
