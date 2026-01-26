@@ -1,3 +1,4 @@
+-- Harutoki Ultimate: Full Restore & Elite ESP Edition
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -15,29 +16,37 @@ local config = {
     hideUI = true 
 }
 
--- --- GUI ---
+-- --- GUI Parent ---
 local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 gui.Name = "HarutokiUltimate"
+gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
+gui.DisplayOrder = 9999
 
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
 
+-- --- 設定メニュー (復元デザイン) ---
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 400); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -200)
-menuFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15); menuFrame.Visible = false
+menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.Visible = false
 Instance.new("UIStroke", menuFrame).Color = Color3.new(1, 1, 1); Instance.new("UICorner", menuFrame)
 
-local function createBtn(txt, y)
+local function createMenuBtn(txt, y)
     local b = Instance.new("TextButton", menuFrame); b.Size = UDim2.new(0.9, 0, 0, 35); b.Position = UDim2.new(0.05, 0, 0, y)
-    b.BackgroundColor3 = Color3.fromRGB(40, 40, 40); b.TextColor3 = Color3.new(1, 1, 1); b.Text = txt; b.TextSize = 14; b.Font = Enum.Font.RobotoMono
+    b.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2); b.TextColor3 = Color3.new(1, 1, 1); b.Text = txt; b.TextScaled = true; b.Font = Enum.Font.RobotoMono
     Instance.new("UICorner", b); return b
 end
 
 local btns = {
-    aim = createBtn("AIM: OFF", 50), mode = createBtn("MODE: LOCK", 95), fire = createBtn("FIRE: OFF", 140),
-    wall = createBtn("AIM FIL: ON", 185), esp = createBtn("ESP FIL: ON", 230), hide = createBtn("HIDE UI: ON", 275), close = createBtn("CLOSE", 320)
+    aim = createMenuBtn("AIMBOT", 50),
+    mode = createMenuBtn("MODE: LOCK", 95),
+    fire = createMenuBtn("AUTO FIRE", 140),
+    wall = createMenuBtn("FILTER", 185),
+    esp = createMenuBtn("ESP FIL", 230),
+    hide = createMenuBtn("HIDE UI", 275),
+    close = createMenuBtn("CLOSE", 320)
 }
 
 local function updateUI()
@@ -45,50 +54,57 @@ local function updateUI()
     btns.aim.Text = "AIM: " .. (config.aimbot and "ON" or "OFF")
     btns.mode.Text = "MODE: " .. config.aimMode
     btns.fire.Text = "FIRE: " .. (config.autoFire and "ON" or "OFF")
-    btns.wall.Text = "AIM FIL: " .. (config.wallCheck and "ON" or "OFF")
+    btns.wall.Text = "FILTER: " .. (config.wallCheck and "ON" or "OFF")
     btns.esp.Text = "ESP FIL: " .. (config.espFilter and "ON" or "OFF")
     btns.hide.Text = "HIDE UI: " .. (config.hideUI and "ON" or "OFF")
 end
 
 local actions = {
-    aim = function() config.aimbot = not config.aimbot; if config.aimbot then config.aimMode = "LOCK" end end,
-    mode = function() if config.aimbot then config.aimMode = (config.aimMode == "LOCK" and "STICKY" or "LOCK") end end,
-    fire = function() config.autoFire = not config.autoFire end,
-    wall = function() config.wallCheck = not config.wallCheck end,
-    esp = function() config.espFilter = not config.espFilter end,
-    hide = function() config.hideUI = not config.hideUI end,
-    menu = function() config.menuOpen = not config.menuOpen end
+    aim = function() config.aimbot = not config.aimbot; updateUI() end,
+    mode = function() config.aimMode = (config.aimMode == "LOCK" and "STICKY" or "LOCK"); updateUI() end,
+    fire = function() config.autoFire = not config.autoFire; updateUI() end,
+    wall = function() config.wallCheck = not config.wallCheck; updateUI() end,
+    esp = function() config.espFilter = not config.espFilter; updateUI() end,
+    hide = function() config.hideUI = not config.hideUI; updateUI() end,
+    menu = function() config.menuOpen = not config.menuOpen; updateUI() end
 }
 
-for k, v in pairs(btns) do if k ~= "close" then v.MouseButton1Click:Connect(function() actions[k](); updateUI() end) end end
+for k, v in pairs(btns) do if k ~= "close" then v.MouseButton1Click:Connect(function() actions[k]() end) end end
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- [判定の最速・最適化] ---
+-- --- [判定ロジック] ---
 local function canSeePlayer(targetChar)
     if not targetChar then return false end
     local cam = workspace.CurrentCamera
     local parts = {targetChar:FindFirstChild("Head"), targetChar:FindFirstChild("UpperTorso")}
-    
-    local params = RaycastParams.new()
-    params.FilterDescendantsInstances = {LP.Character, targetChar, cam} -- 自分と敵とカメラを無視
-    params.FilterType = Enum.RaycastFilterType.Exclude
-
+    local params = RaycastParams.new(); params.FilterDescendantsInstances = {LP.Character, targetChar, cam}; params.FilterType = Enum.RaycastFilterType.Exclude
     for _, p in pairs(parts) do
         if p then
             local res = workspace:Raycast(cam.CFrame.Position, (p.Position - cam.CFrame.Position), params)
-            if not res then return true end -- 障害物なし
+            if not res then return true end
         end
     end
     return false
 end
 
--- --- ESP ---
+-- --- ESP完全復元デザイン ---
 local pESP = {}
 local function createESP(v)
-    local c = Instance.new("Frame", gui); c.BackgroundTransparency = 1; c.Visible = false
-    local m = Instance.new("Frame", c); m.Size = UDim2.new(1, 0, 1, 0); m.BackgroundTransparency = 1; local s = Instance.new("UIStroke", m); s.Thickness = 2
-    local n = Instance.new("TextLabel", c); n.Size = UDim2.new(1, 0, 0, 15); n.Position = UDim2.new(0, 0, 0, -18); n.BackgroundTransparency = 1; n.TextColor3 = Color3.new(1,1,1); n.TextScaled = true; n.Font = Enum.Font.RobotoMono; Instance.new("UIStroke", n)
-    pESP[v] = {Main = c, Stroke = s, Name = n}
+    local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
+    local mainFrame = Instance.new("Frame", container); mainFrame.Size = UDim2.new(1, 0, 1, 0); mainFrame.BackgroundTransparency = 1; local stroke = Instance.new("UIStroke", mainFrame); stroke.Thickness = 2
+    local name = Instance.new("TextLabel", container); name.Size = UDim2.new(1, 0, 0, 15); name.Position = UDim2.new(0, 0, 0, -18)
+    local healthNum = Instance.new("TextLabel", container); healthNum.Size = UDim2.new(0, 40, 0, 15); healthNum.Position = UDim2.new(0, -45, 0, -5)
+    local ava = Instance.new("ImageLabel", container); ava.Size = UDim2.new(0.6, 0, 0.6, 0); ava.Position = UDim2.new(0.2, 0, 0.2, 0); ava.BackgroundTransparency = 1
+    local barBG = Instance.new("Frame", container); barBG.Size = UDim2.new(0, 4, 1, 0); barBG.Position = UDim2.new(0, -8, 0, 0); barBG.BackgroundColor3 = Color3.new(0,0,0)
+    local bar = Instance.new("Frame", barBG); bar.Size = UDim2.new(1, 0, 1, 0); bar.AnchorPoint = Vector2.new(0, 1); bar.Position = UDim2.new(0, 0, 1, 0)
+    
+    local function style(t)
+        t.BackgroundTransparency, t.TextColor3, t.Font, t.TextScaled = 1, Color3.new(1, 1, 1), Enum.Font.RobotoMono, true
+        Instance.new("UIStroke", t)
+    end
+    style(name); style(healthNum)
+    
+    pESP[v] = {Main = container, Name = name, HealthNum = healthNum, Ava = ava, Bar = bar, Stroke = stroke}
     return pESP[v]
 end
 
@@ -98,7 +114,7 @@ P.PlayerRemoving:Connect(function(v) if pESP[v] then pESP[v].Main:Destroy(); pES
 local kState = {}
 R.RenderStepped:Connect(function()
     if not U:GetFocusedTextBox() then
-        local function h(k, a) if U:IsKeyDown(k) then if not kState[k] then a(); kState[k]=true; updateUI() end else kState[k]=false end end
+        local function h(k, a) if U:IsKeyDown(k) then if not kState[k] then a(); kState[k]=true; end else kState[k]=false end end
         h(Enum.KeyCode.RightShift, actions.menu); h(Enum.KeyCode.J, actions.aim); h(Enum.KeyCode.K, actions.fire)
         h(Enum.KeyCode.L, actions.wall); h(Enum.KeyCode.U, actions.mode); h(Enum.KeyCode.N, actions.esp); h(Enum.KeyCode.M, actions.hide)
     end
@@ -123,7 +139,13 @@ R.RenderStepped:Connect(function()
                 if show then
                     local hS = math.clamp(1000/pos.Z, 10, 500); local wS = hS * 0.7
                     esp.Main.Position = UDim2.new(0, pos.X - wS/2, 0, pos.Y - hS/2); esp.Main.Size = UDim2.new(0, wS, 0, hS)
-                    esp.Name.Text = v.DisplayName; esp.Stroke.Color = canSee and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+                    esp.Name.Text = v.DisplayName; esp.HealthNum.Text = math.floor(hum.Health)
+                    esp.Ava.Image = "rbxthumb://type=AvatarHeadShot&id="..v.UserId.."&w=150&h=150"
+                    
+                    local color = canSee and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+                    esp.Stroke.Color = color
+                    esp.Bar.BackgroundColor3 = color
+                    esp.Bar.Size = UDim2.new(1, 0, hum.Health/hum.MaxHealth, 0)
                 end
 
                 if (not config.wallCheck or canSee) then
@@ -133,7 +155,7 @@ R.RenderStepped:Connect(function()
                         near = d 
                     end
                 end
-                if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 120 then fireOk = true end
+                if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 100 then fireOk = true end
             elseif pESP[v] then pESP[v].Main.Visible = false end
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
