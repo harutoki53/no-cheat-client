@@ -12,7 +12,7 @@ local config = {
     smooth = 0.2,
     pcFov = 500,
     menuOpen = false,
-    hideUI = false 
+    hideUI = true 
 }
 
 -- --- GUI ---
