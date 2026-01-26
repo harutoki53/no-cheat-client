@@ -1,4 +1,4 @@
--- Rivals Script: Harutoki Ultimate (Final Stable Build)
+-- Rivals Script: Harutoki Ultimate (Final Realistic & High-Precision)
 -- Keybinds: J, K, L, U, N, M | RightShift (Menu)
 
 local P = game:GetService("Players")
@@ -9,13 +9,12 @@ local LP = P.LocalPlayer
 -- --- [1] Configuration ---
 local config = {
     aimbot = false,
-    aimMode = "LOCK", -- LOCK (右クリ) / STICKY (常に)
+    aimMode = "LOCK",
     autoFire = false,
     wallCheck = true,
     espFilter = true,
-    smooth = 0.22,
+    smooth = 0.18, -- 追従性と滑らかさのバランスを最適化
     pcFov = 800,
-    maxDistance = 1000,
     menuOpen = false,
     hideUI = true -- 起動時はON
 }
@@ -25,35 +24,24 @@ local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 gui.Name = "HarutokiUltimate"
 gui.ResetOnSpawn = false
 
--- 古いGUIの掃除
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
 
 local menuFrame = Instance.new("Frame", gui)
-menuFrame.Size = UDim2.new(0, 220, 0, 400)
-menuFrame.Position = UDim2.new(0.5, -110, 0.5, -200)
-menuFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-menuFrame.Visible = false
-Instance.new("UIStroke", menuFrame).Color = Color3.new(1, 1, 1)
-Instance.new("UICorner", menuFrame)
+menuFrame.Size = UDim2.new(0, 220, 0, 400); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -200)
+menuFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15); menuFrame.Visible = false
+Instance.new("UIStroke", menuFrame).Color = Color3.new(1, 1, 1); Instance.new("UICorner", menuFrame)
 
-local function createMenuBtn(txt, y)
-    local b = Instance.new("TextButton", menuFrame)
-    b.Size = UDim2.new(0.9, 0, 0, 35); b.Position = UDim2.new(0.05, 0, 0, y)
-    b.BackgroundColor3 = Color3.fromRGB(40, 40, 40); b.TextColor3 = Color3.new(1, 1, 1)
-    b.Text = txt; b.TextSize = 14; b.Font = Enum.Font.RobotoMono
+local function createBtn(txt, y)
+    local b = Instance.new("TextButton", menuFrame); b.Size = UDim2.new(0.9, 0, 0, 35); b.Position = UDim2.new(0.05, 0, 0, y)
+    b.BackgroundColor3 = Color3.fromRGB(40, 40, 40); b.TextColor3 = Color3.new(1, 1, 1); b.Text = txt; b.TextSize = 14; b.Font = Enum.Font.RobotoMono
     Instance.new("UICorner", b); return b
 end
 
 local btns = {
-    aim = createMenuBtn("AIM: OFF", 50),
-    mode = createMenuBtn("MODE: LOCK", 95),
-    fire = createMenuBtn("FIRE: OFF", 140),
-    wall = createMenuBtn("AIM FIL: ON", 185),
-    esp = createMenuBtn("ESP FIL: ON", 230),
-    hide = createMenuBtn("HIDE UI: ON", 275),
-    close = createMenuBtn("CLOSE", 320)
+    aim = createBtn("AIM: OFF", 50), mode = createBtn("MODE: LOCK", 95), fire = createBtn("FIRE: OFF", 140),
+    wall = createBtn("AIM FIL: ON", 185), esp = createBtn("ESP FIL: ON", 230), hide = createBtn("HIDE UI: ON", 275), close = createBtn("CLOSE", 320)
 }
 
 local function updateUI()
@@ -68,13 +56,8 @@ end
 
 -- --- [3] Action Logic ---
 local actions = {
-    aim = function() 
-        config.aimbot = not config.aimbot 
-        if config.aimbot then config.aimMode = "LOCK" end 
-    end,
-    mode = function() 
-        if config.aimbot then config.aimMode = (config.aimMode == "LOCK" and "STICKY" or "LOCK") end 
-    end,
+    aim = function() config.aimbot = not config.aimbot; if config.aimbot then config.aimMode = "LOCK" end end,
+    mode = function() if config.aimbot then config.aimMode = (config.aimMode == "LOCK" and "STICKY" or "LOCK") end end,
     fire = function() config.autoFire = not config.autoFire end,
     wall = function() config.wallCheck = not config.wallCheck end,
     esp = function() config.espFilter = not config.espFilter end,
@@ -82,112 +65,101 @@ local actions = {
     menu = function() config.menuOpen = not config.menuOpen end
 }
 
--- ボタンイベント接続
-btns.aim.MouseButton1Click:Connect(function() actions.aim(); updateUI() end)
-btns.mode.MouseButton1Click:Connect(function() actions.mode(); updateUI() end)
-btns.fire.MouseButton1Click:Connect(function() actions.fire(); updateUI() end)
-btns.wall.MouseButton1Click:Connect(function() actions.wall(); updateUI() end)
-btns.esp.MouseButton1Click:Connect(function() actions.esp(); updateUI() end)
-btns.hide.MouseButton1Click:Connect(function() actions.hide(); updateUI() end)
+for k, v in pairs(btns) do if k ~= "close" then v.MouseButton1Click:Connect(function() actions[k](); updateUI() end) end end
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- [4] Input Engine (Low Latency) ---
-local keyState = {}
-local function handleToggle(key, action)
-    if U:IsKeyDown(key) then
-        if not keyState[key] then
-            action()
-            keyState[key] = true
-            updateUI()
-        end
-    else
-        keyState[key] = false
-    end
+-- --- [4] Detection Engine (視線判定の強化) ---
+local function isPartVisible(char, part, camPos)
+    if not part then return false end
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LP.Character, char, workspace.CurrentCamera}
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    local result = workspace:Raycast(camPos, (part.Position - camPos).Unit * 1000, rayParams)
+    return not result
 end
 
--- --- [5] ESP & Aim Engine ---
+local function checkGeneralVis(char, camPos)
+    -- 頭か胴体のどちらかが見えていれば「可視」と判定
+    return isPartVisible(char, char:FindFirstChild("Head"), camPos) or 
+           isPartVisible(char, char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"), camPos)
+end
+
+-- --- [5] ESP System ---
 local pESP = {}
 local function createESP(v)
     local c = Instance.new("Frame", gui); c.BackgroundTransparency = 1; c.Visible = false
-    local m = Instance.new("Frame", c); m.Size = UDim2.new(1, 0, 1, 0); m.BackgroundTransparency = 1
-    local s = Instance.new("UIStroke", m); s.Thickness = 2
-    local n = Instance.new("TextLabel", c); n.Size = UDim2.new(1, 0, 0, 15); n.Position = UDim2.new(0, 0, 0, -18)
-    n.BackgroundTransparency = 1; n.TextColor3 = Color3.new(1, 1, 1); n.TextScaled = true; n.Font = Enum.Font.RobotoMono
-    Instance.new("UIStroke", n)
+    local m = Instance.new("Frame", c); m.Size = UDim2.new(1, 0, 1, 0); m.BackgroundTransparency = 1; local s = Instance.new("UIStroke", m); s.Thickness = 2
+    local n = Instance.new("TextLabel", c); n.Size = UDim2.new(1, 0, 0, 15); n.Position = UDim2.new(0, 0, 0, -18); n.BackgroundTransparency = 1; n.TextColor3 = Color3.new(1,1,1); n.TextScaled = true; n.Font = Enum.Font.RobotoMono; Instance.new("UIStroke", n)
     pESP[v] = {Main = c, Stroke = s, Name = n}
     return pESP[v]
 end
 
 P.PlayerRemoving:Connect(function(v) if pESP[v] then pESP[v].Main:Destroy(); pESP[v] = nil end end)
 
+-- --- [6] Main Loop ---
+local keyState = {}
 R.RenderStepped:Connect(function()
-    -- キー入力判定 (即時反映)
+    -- 低遅延キー入力
     if not U:GetFocusedTextBox() then
-        handleToggle(Enum.KeyCode.RightShift, actions.menu)
-        handleToggle(Enum.KeyCode.J, actions.aim)
-        handleToggle(Enum.KeyCode.K, actions.fire)
-        handleToggle(Enum.KeyCode.L, actions.wall)
-        handleToggle(Enum.KeyCode.U, actions.mode)
-        handleToggle(Enum.KeyCode.N, actions.esp)  -- ESPフィルタ
-        handleToggle(Enum.KeyCode.M, actions.hide) -- HIDE UI
+        local function h(k, a) if U:IsKeyDown(k) then if not keyState[k] then a(); keyState[k]=true; updateUI() end else keyState[k]=false end end
+        h(Enum.KeyCode.RightShift, actions.menu); h(Enum.KeyCode.J, actions.aim); h(Enum.KeyCode.K, actions.fire)
+        h(Enum.KeyCode.L, actions.wall); h(Enum.KeyCode.U, actions.mode); h(Enum.KeyCode.N, actions.esp); h(Enum.KeyCode.M, actions.hide)
     end
 
-    local C = workspace.CurrentCamera
-    if not C or not LP.Character then return end
+    local C = workspace.CurrentCamera; if not C or not LP.Character then return end
     local center = Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2)
-    local target, near = nil, config.pcFov
-    local fireAllowed = false
+    local target, near = nil, config.pcFov; local fireOk = false
 
     for _, v in pairs(P:GetPlayers()) do
-        if v == LP or (LP.Team and v.Team == LP.Team) then 
-            if pESP[v] then pESP[v].Main.Visible = false end continue 
-        end
-        local char = v.Character
-        local head = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart"))
-        local hum = char and char:FindFirstChildWhichIsA("Humanoid")
-
+        if v == LP or (LP.Team and v.Team == LP.Team) then if pESP[v] then pESP[v].Main.Visible = false end continue end
+        local ch = v.Character; local hum = ch and ch:FindFirstChildWhichIsA("Humanoid")
+        local head = ch and ch:FindFirstChild("Head")
+        
         if head and hum and hum.Health > 0 then
-            local pos, vis = C:WorldToViewportPoint(head.Position)
-            if vis then
+            local pos, onScreen = C:WorldToViewportPoint(head.Position)
+            local canSee = checkGeneralVis(ch, C.CFrame.Position)
+            
+            if onScreen then
                 local esp = pESP[v] or createESP(v)
-                local rayParams = RaycastParams.new()
-                rayParams.FilterDescendantsInstances = {LP.Character, char, C}
-                local ray = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * 1000, rayParams)
-                local canSee = not ray
-
-                local showESP = (not config.hideUI) and ((not config.espFilter) or canSee)
-                esp.Main.Visible = showESP
-                if showESP then
-                    local h = math.clamp(1000/pos.Z, 10, 500); local w = h * 0.7
-                    esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/2); esp.Main.Size = UDim2.new(0, w, 0, h)
-                    esp.Name.Text = v.DisplayName
-                    esp.Stroke.Color = canSee and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+                local show = (not config.hideUI) and ((not config.espFilter) or canSee)
+                esp.Main.Visible = show
+                if show then
+                    local hSize = math.clamp(1000/pos.Z, 10, 500); local wSize = hSize * 0.7
+                    esp.Main.Position = UDim2.new(0, pos.X - wSize/2, 0, pos.Y - hSize/2); esp.Main.Size = UDim2.new(0, wSize, 0, hSize)
+                    esp.Name.Text = v.DisplayName; esp.Stroke.Color = canSee and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
                 end
 
                 if (not config.wallCheck or canSee) then
-                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if dist < near then target = head; near = dist end
+                    local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if d < near then
+                        -- 【リアリティ実装】75%頭、25%胴体をランダムで狙う
+                        local chosenPart = (math.random(1, 100) <= 75) and head or ch:FindFirstChild("UpperTorso") or ch:FindFirstChild("Torso") or head
+                        target = chosenPart; near = d 
+                    end
                 end
-                if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 100 then fireAllowed = true end
+                -- オート射撃判定（見える敵かつ中心に近い場合）
+                if canSee and (Vector2.new(pos.X, pos.Y) - center).Magnitude < 120 then fireOk = true end
             elseif pESP[v] then pESP[v].Main.Visible = false end
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    -- AIMボット実行
+    -- エイムボット追従
     if target and config.aimbot then
-        local am = config.aimMode
-        if am == "STICKY" or (am == "LOCK" and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)) then
+        local isPressed = U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        if config.aimMode == "STICKY" or isPressed then
             local p = C:WorldToViewportPoint(target.Position)
             if mousemoverel then
+                -- ターゲットが移動してもリアルタイムで中心に引き寄せる
                 mousemoverel((p.X - center.X) * config.smooth, (p.Y - center.Y) * config.smooth)
             end
         end
     end
 
-    -- AUTO FIRE実行
-    if config.autoFire and fireAllowed and mouse1press then
+    -- オート射撃
+    if config.autoFire and fireOk and mouse1press then
         mouse1press(); task.wait(0.01); mouse1release()
     end
 end)
 
 updateUI()
+print("Harutoki Ultimate: Final Realistic Version Loaded")
