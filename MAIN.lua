@@ -1,29 +1,31 @@
--- Rivals Script: Harutoki Ultimate (Ultra-Low Latency Build)
--- Keybinds: J, K, L, U, I, O | RightShift (Instant Response)
+-- Rivals Script: Harutoki Ultimate (Final Stable Build)
+-- Keybinds: J, K, L, U, N, M | RightShift (Menu)
 
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
 local LP = P.LocalPlayer
 
+-- --- [1] Configuration ---
 local config = {
     aimbot = false,
-    aimMode = "LOCK",
+    aimMode = "LOCK", -- LOCK (右クリ) / STICKY (常に)
     autoFire = false,
     wallCheck = true,
     espFilter = true,
-    smooth = 0.2, -- 反応速度を上げるため少し数値を調整
+    smooth = 0.22,
     pcFov = 800,
     maxDistance = 1000,
     menuOpen = false,
-    hideUI = true
+    hideUI = true -- 起動時はON
 }
 
--- --- GUI System ---
+-- --- [2] GUI System ---
 local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 gui.Name = "HarutokiUltimate"
 gui.ResetOnSpawn = false
 
+-- 古いGUIの掃除
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
@@ -64,7 +66,46 @@ local function updateUI()
     btns.hide.Text = "HIDE UI: " .. (config.hideUI and "ON" or "OFF")
 end
 
--- --- ESP System ---
+-- --- [3] Action Logic ---
+local actions = {
+    aim = function() 
+        config.aimbot = not config.aimbot 
+        if config.aimbot then config.aimMode = "LOCK" end 
+    end,
+    mode = function() 
+        if config.aimbot then config.aimMode = (config.aimMode == "LOCK" and "STICKY" or "LOCK") end 
+    end,
+    fire = function() config.autoFire = not config.autoFire end,
+    wall = function() config.wallCheck = not config.wallCheck end,
+    esp = function() config.espFilter = not config.espFilter end,
+    hide = function() config.hideUI = not config.hideUI end,
+    menu = function() config.menuOpen = not config.menuOpen end
+}
+
+-- ボタンイベント接続
+btns.aim.MouseButton1Click:Connect(function() actions.aim(); updateUI() end)
+btns.mode.MouseButton1Click:Connect(function() actions.mode(); updateUI() end)
+btns.fire.MouseButton1Click:Connect(function() actions.fire(); updateUI() end)
+btns.wall.MouseButton1Click:Connect(function() actions.wall(); updateUI() end)
+btns.esp.MouseButton1Click:Connect(function() actions.esp(); updateUI() end)
+btns.hide.MouseButton1Click:Connect(function() actions.hide(); updateUI() end)
+btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
+
+-- --- [4] Input Engine (Low Latency) ---
+local keyState = {}
+local function handleToggle(key, action)
+    if U:IsKeyDown(key) then
+        if not keyState[key] then
+            action()
+            keyState[key] = true
+            updateUI()
+        end
+    else
+        keyState[key] = false
+    end
+end
+
+-- --- [5] ESP & Aim Engine ---
 local pESP = {}
 local function createESP(v)
     local c = Instance.new("Frame", gui); c.BackgroundTransparency = 1; c.Visible = false
@@ -79,39 +120,17 @@ end
 
 P.PlayerRemoving:Connect(function(v) if pESP[v] then pESP[v].Main:Destroy(); pESP[v] = nil end end)
 
--- --- 超高速入力検知ロジック ---
-local keyState = {}
-local function isKeyDown(k)
-    return U:IsKeyDown(k)
-end
-
-local function toggle(key, action)
-    if isKeyDown(key) then
-        if not keyState[key] then
-            action()
-            keyState[key] = true
-            updateUI()
-        end
-    else
-        keyState[key] = false
-    end
-end
-
--- --- メインエンジン (低遅延ループ) ---
 R.RenderStepped:Connect(function()
-    -- キー判定を毎フレーム最初に行う (イベント待ちをしない)
-    toggle(Enum.KeyCode.RightShift, function() config.menuOpen = not config.menuOpen end)
-    toggle(Enum.KeyCode.J, function() 
-        config.aimbot = not config.aimbot 
-        if config.aimbot then config.aimMode = "LOCK" end 
-    end)
-    toggle(Enum.KeyCode.K, function() config.autoFire = not config.autoFire end)
-    toggle(Enum.KeyCode.L, function() config.wallCheck = not config.wallCheck end)
-    toggle(Enum.KeyCode.U, function() 
-        if config.aimbot then config.aimMode = (config.aimMode == "LOCK" and "STICKY" or "LOCK") end 
-    end)
-    toggle(Enum.KeyCode.I, function() config.espFilter = not config.espFilter end)
-    toggle(Enum.KeyCode.O, function() config.hideUI = not config.hideUI end)
+    -- キー入力判定 (即時反映)
+    if not U:GetFocusedTextBox() then
+        handleToggle(Enum.KeyCode.RightShift, actions.menu)
+        handleToggle(Enum.KeyCode.J, actions.aim)
+        handleToggle(Enum.KeyCode.K, actions.fire)
+        handleToggle(Enum.KeyCode.L, actions.wall)
+        handleToggle(Enum.KeyCode.U, actions.mode)
+        handleToggle(Enum.KeyCode.N, actions.esp)  -- ESPフィルタ
+        handleToggle(Enum.KeyCode.M, actions.hide) -- HIDE UI
+    end
 
     local C = workspace.CurrentCamera
     if not C or not LP.Character then return end
@@ -123,7 +142,6 @@ R.RenderStepped:Connect(function()
         if v == LP or (LP.Team and v.Team == LP.Team) then 
             if pESP[v] then pESP[v].Main.Visible = false end continue 
         end
-
         local char = v.Character
         local head = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart"))
         local hum = char and char:FindFirstChildWhichIsA("Humanoid")
@@ -139,7 +157,6 @@ R.RenderStepped:Connect(function()
 
                 local showESP = (not config.hideUI) and ((not config.espFilter) or canSee)
                 esp.Main.Visible = showESP
-
                 if showESP then
                     local h = math.clamp(1000/pos.Z, 10, 500); local w = h * 0.7
                     esp.Main.Position = UDim2.new(0, pos.X - w/2, 0, pos.Y - h/2); esp.Main.Size = UDim2.new(0, w, 0, h)
@@ -156,10 +173,10 @@ R.RenderStepped:Connect(function()
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    -- エイム
+    -- AIMボット実行
     if target and config.aimbot then
-        local shouldAim = (config.aimMode == "STICKY") or (U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
-        if shouldAim then
+        local am = config.aimMode
+        if am == "STICKY" or (am == "LOCK" and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)) then
             local p = C:WorldToViewportPoint(target.Position)
             if mousemoverel then
                 mousemoverel((p.X - center.X) * config.smooth, (p.Y - center.Y) * config.smooth)
@@ -167,12 +184,10 @@ R.RenderStepped:Connect(function()
         end
     end
 
-    -- オート射撃
+    -- AUTO FIRE実行
     if config.autoFire and fireAllowed and mouse1press then
         mouse1press(); task.wait(0.01); mouse1release()
     end
 end)
 
--- ボタンクリックも維持
-btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 updateUI()
