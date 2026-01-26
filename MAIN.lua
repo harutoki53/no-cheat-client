@@ -1,4 +1,4 @@
--- Rivals Script: Harutoki Ultimate (Full ESP Restore & Keybinds)
+-- Rivals Script: Harutoki Ultimate (Clean ESP & Default Stealth)
 local P = game:GetService("Players")
 local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
@@ -12,7 +12,7 @@ local config = {
     pcFov = 800,
     maxDistance = 1000,
     menuOpen = false,
-    hideUI = true -- デフォルトON
+    hideUI = true -- [修正] デフォルトでON
 }
 
 -- --- GUI完全復元 ---
@@ -22,6 +22,7 @@ gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 9999
 
+-- クリーンアップ
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate" and v ~= gui then v:Destroy() end
 end
@@ -36,7 +37,7 @@ local function isEnemy(v)
     return true
 end
 
--- --- 設定メニュー (元のデザイン完全復元) ---
+-- --- 設定メニュー (元のデザイン) ---
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 220, 0, 320); menuFrame.Position = UDim2.new(0.5, -110, 0.5, -150)
 menuFrame.BackgroundColor3 = Color3.new(0, 0, 0); menuFrame.Visible = false
@@ -62,7 +63,7 @@ local function updateUI()
     hideBtn.Text = "HIDE UI: " .. (config.hideUI and "ON" or "OFF")
 end
 
--- --- キーバインド設定 (J, K, L, ;) ---
+-- --- キーショートカット (J, K, L, ;) ---
 U.InputBegan:Connect(function(i, gpe)
     if gpe then return end
     if i.KeyCode == Enum.KeyCode.RightShift then
@@ -73,7 +74,7 @@ U.InputBegan:Connect(function(i, gpe)
         config.autoFire = not config.autoFire; updateUI()
     elseif i.KeyCode == Enum.KeyCode.L then
         config.wallCheck = not config.wallCheck; updateUI()
-    elseif i.KeyCode == Enum.KeyCode.Semicolon then -- ";"キー
+    elseif i.KeyCode == Enum.KeyCode.Semicolon then
         config.hideUI = not config.hideUI; updateUI()
     end
 end)
@@ -84,7 +85,7 @@ wallBtn.MouseButton1Click:Connect(function() config.wallCheck = not config.wallC
 hideBtn.MouseButton1Click:Connect(function() config.hideUI = not config.hideUI; updateUI() end)
 closeBtn.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- ESPオブジェクト管理 (完全復元) ---
+-- --- ESPオブジェクト管理 ---
 local pESP = {}
 local function createESP(v)
     local container = Instance.new("Frame", gui); container.BackgroundTransparency = 1; container.Visible = false
@@ -102,6 +103,14 @@ local function createESP(v)
     pESP[v] = {Main = container, Name = name, HealthNum = healthNum, Ava = ava, Bar = bar, Stroke = stroke}
     return pESP[v]
 end
+
+-- [修正] プレイヤー退出時にESPを消去する
+P.PlayerRemoving:Connect(function(v)
+    if pESP[v] then
+        pESP[v].Main:Destroy()
+        pESP[v] = nil
+    end
+end)
 
 -- --- メインエンジン ---
 R.RenderStepped:Connect(function()
@@ -133,7 +142,7 @@ R.RenderStepped:Connect(function()
                 local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
                 local isVisible = not result
 
-                -- [重要] HIDE UI判定：OFFの時だけESPを表示
+                -- HIDE UI判定
                 esp.Main.Visible = not config.hideUI
 
                 if not config.hideUI then
@@ -175,4 +184,4 @@ R.RenderStepped:Connect(function()
 end)
 
 updateUI()
-print("Harutoki Ultimate: Keyboard Shortcuts Active (J,K,L,;)")
+print("Harutoki Ultimate: Stealth Mode (HIDE-UI: ON, Clean Logout)")
