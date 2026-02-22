@@ -3,7 +3,7 @@ local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
 local LP = P.LocalPlayer
 
--- --- デフォルト設定 (ご要望の初期値) ---
+-- --- デフォルト設定 (ご要望通り) ---
 local config = {
     aimbot = true,      -- J: 最初からON
     autoFire = false,   -- K: 最初はOFF
@@ -12,7 +12,7 @@ local config = {
     smooth = 0.4,
     pcFov = 800,
     maxDistance = 500,
-    menuOpen = false    -- 最初はメニューを閉じておく
+    menuOpen = false    -- 初期は閉じ
 }
 
 -- --- GUI (Harutoki Ultimate) ---
@@ -20,7 +20,6 @@ local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 gui.Name = "HarutokiUltimate_Final"
 gui.IgnoreGuiInset = true; gui.ResetOnSpawn = false; gui.DisplayOrder = 9999
 
--- 二重起動防止
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate_Final" and v ~= gui then v:Destroy() end
 end
@@ -40,62 +39,61 @@ end
 local btns = {
     aim = createMenuBtn("AIM: ON", 50),
     fire = createMenuBtn("FIRE: OFF", 95),
-    wall = createMenuBtn("WALL FIL: ON", 140),
+    wall = createMenuBtn("WALL: ON", 140),
     hide = createMenuBtn("ESP: OFF", 185),
     close = createMenuBtn("CLOSE", 230)
 }
 
-local function updateUI(showNotice)
+-- --- 通知用ラベル (Shift時のみ使用) ---
+local notifyLabel = Instance.new("TextLabel", gui)
+notifyLabel.Size = UDim2.new(0, 200, 0, 30); notifyLabel.Position = UDim2.new(0.5, -100, 0.1, 0)
+notifyLabel.BackgroundTransparency = 1; notifyLabel.TextColor3 = Color3.new(1, 1, 1); notifyLabel.TextTransparency = 1
+notifyLabel.Font = Enum.Font.RobotoMono; notifyLabel.TextScaled = true
+
+local function showNotify(txt)
+    notifyLabel.Text = txt
+    notifyLabel.TextTransparency = 0
+    task.delay(1.5, function() notifyLabel.TextTransparency = 1 end)
+end
+
+local function updateUI()
     menuFrame.Visible = config.menuOpen
     btns.aim.Text = "AIM: " .. (config.aimbot and "ON" or "OFF")
     btns.fire.Text = "FIRE: " .. (config.autoFire and "ON" or "OFF")
     btns.wall.Text = "WALL: " .. (config.wallCheck and "ON" or "OFF")
     btns.hide.Text = "ESP: " .. (config.hideUI and "OFF" or "ON")
-    
-    -- Shift押下時のみ通知を出す
-    if showNotice then
-        local n = Instance.new("Message", game.CoreGui)
-        n.Text = config.menuOpen and "メニューを表示しました" or "メニューを閉じました"
-        task.delay(1, function() n:Destroy() end)
-    end
 end
 
--- ボタンクリック処理
+-- キー入力処理
+U.InputBegan:Connect(function(i, gpe)
+    if gpe then return end
+    if i.KeyCode == Enum.KeyCode.J then
+        config.aimbot = not config.aimbot
+        updateUI() -- 通知なし
+    elseif i.KeyCode == Enum.KeyCode.K then
+        config.autoFire = not config.autoFire
+        updateUI() -- 通知なし
+    elseif i.KeyCode == Enum.KeyCode.L then
+        config.wallCheck = not config.wallCheck
+        updateUI() -- 通知なし
+    elseif i.KeyCode == Enum.KeyCode.H then
+        config.hideUI = not config.hideUI
+        updateUI() -- 通知なし
+    elseif i.KeyCode == Enum.KeyCode.LeftShift or i.KeyCode == Enum.KeyCode.RightShift then
+        config.menuOpen = not config.menuOpen
+        updateUI()
+        showNotify(config.menuOpen and "MENU: OPEN" or "MENU: CLOSED") -- Shiftだけ通知
+    end
+end)
+
+-- ボタンクリック
 btns.aim.MouseButton1Click:Connect(function() config.aimbot = not config.aimbot; updateUI() end)
 btns.fire.MouseButton1Click:Connect(function() config.autoFire = not config.autoFire; updateUI() end)
 btns.wall.MouseButton1Click:Connect(function() config.wallCheck = not config.wallCheck; updateUI() end)
 btns.hide.MouseButton1Click:Connect(function() config.hideUI = not config.hideUI; updateUI() end)
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- キー入力判定 (J, K, L, H はサイレント / Shift はメニュー) ---
-U.InputBegan:Connect(function(i, gpe)
-    if gpe then return end
-    
-    if i.KeyCode == Enum.KeyCode.J then
-        config.aimbot = not config.aimbot
-        updateUI(false) -- サイレント
-    elseif i.KeyCode == Enum.KeyCode.K then
-        config.autoFire = not config.autoFire
-        updateUI(false) -- サイレント
-    elseif i.KeyCode == Enum.KeyCode.L then
-        config.wallCheck = not config.wallCheck
-        updateUI(false) -- サイレント
-    elseif i.KeyCode == Enum.KeyCode.H then
-        config.hideUI = not config.hideUI
-        updateUI(false) -- サイレント
-    elseif i.KeyCode == Enum.KeyCode.LeftShift or i.KeyCode == Enum.KeyCode.RightShift then
-        config.menuOpen = not config.menuOpen
-        updateUI(true)  -- Shift時のみ表示
-    end
-end)
-
--- --- ESP & メインエンジン (既存ロジック継承) ---
-local function isEnemy(v)
-    if not v or v == LP then return false end
-    if LP.Team and v.Team then return LP.Team ~= v.Team end
-    return true
-end
-
+-- --- ESPロジック (提示コードを完全継承) ---
 local pESP = {}
 local function createESP(v)
     if v == LP then return nil end
@@ -115,8 +113,15 @@ local function createESP(v)
     return pESP[v]
 end
 
+local function isEnemy(v)
+    if not v or v == LP then return false end
+    if LP.Team and v.Team then return LP.Team ~= v.Team end
+    return true
+end
+
 P.PlayerRemoving:Connect(function(p) if pESP[p] then pESP[p].Main:Destroy(); pESP[p] = nil end end)
 
+-- --- メインエンジン ---
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C or not LP.Character then return end
@@ -137,13 +142,14 @@ R.RenderStepped:Connect(function()
             local dist = (head.Position - C.CFrame.Position).Magnitude
             local pos, onScreen = C:WorldToViewportPoint(head.Position)
             
+            -- 壁判定
             local rayParams = RaycastParams.new()
             rayParams.FilterDescendantsInstances = {LP.Character, char, C}
             rayParams.FilterType = Enum.RaycastFilterType.Exclude
             local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
             local isVisible = not result
 
-            -- ESP表示 (config.hideUIがfalseの時のみ)
+            -- ESP表示 (config.hideUIがfalse、かつonScreenの時)
             if onScreen and dist <= config.maxDistance and (not config.hideUI) then
                 local esp = pESP[v] or createESP(v)
                 if esp then
@@ -157,7 +163,7 @@ R.RenderStepped:Connect(function()
                 end
             elseif pESP[v] then pESP[v].Main.Visible = false end
 
-            -- エイム判定 (wallCheckがONなら見える敵のみ)
+            -- エイムターゲット選定
             local aimVisible = true
             if config.wallCheck then aimVisible = isVisible end
 
@@ -172,6 +178,7 @@ R.RenderStepped:Connect(function()
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
+    -- エイム実行
     if targetHead and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local pos, _ = C:WorldToViewportPoint(targetHead.Position)
         if mousemoverel then
@@ -179,9 +186,10 @@ R.RenderStepped:Connect(function()
         end
     end
 
+    -- 発射
     if config.autoFire and fireAllowed and mouse1press then
         mouse1press(); task.wait(0.01); mouse1release()
     end
 end)
 
-updateUI(false)
+updateUI()
