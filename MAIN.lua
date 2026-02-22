@@ -7,7 +7,7 @@ local LP = P.LocalPlayer
 local config = {
     aimbot = true,      -- J: 最初からON
     autoFire = false,   -- K: 最初はOFF
-    wallCheck = true,   -- L: 最初はON (壁越しでは動かない設定)
+    wallCheck = true,   -- L: 最初はON (壁越し無効)
     hideUI = true,      -- H: 最初はOFF (ESP非表示)
     smooth = 0.4,
     pcFov = 800,
@@ -15,7 +15,7 @@ local config = {
     menuOpen = false
 }
 
--- --- GUI (元のコードのデザインを完全継承) ---
+-- --- GUI (オリジナルのデザインを完全継承) ---
 local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 gui.Name = "HarutokiUltimate_Final"
 gui.IgnoreGuiInset = true; gui.ResetOnSpawn = false; gui.DisplayOrder = 9999
@@ -54,12 +54,11 @@ local function updateUI()
     menuFrame.Visible = config.menuOpen
     btns.aim.Text = "AIM: " .. (config.aimbot and "ON" or "OFF")
     btns.fire.Text = "FIRE: " .. (config.autoFire and "ON" or "OFF")
-    -- WALL FIL: ON の時は「壁チェックをする（壁裏は撃たない）」
     btns.wall.Text = "WALL FIL: " .. (config.wallCheck and "ON" or "OFF")
     btns.hide.Text = "ESP: " .. (config.hideUI and "OFF" or "ON")
 end
 
--- --- キー入力判定 ---
+-- --- キー入力判定 (J, K, L, Hは無言 / Shiftのみ通知) ---
 U.InputBegan:Connect(function(i, gpe)
     if gpe then return end
     if i.KeyCode == Enum.KeyCode.J then
@@ -71,8 +70,7 @@ U.InputBegan:Connect(function(i, gpe)
     elseif i.KeyCode == Enum.KeyCode.H then
         config.hideUI = not config.hideUI; updateUI()
     elseif i.KeyCode == Enum.KeyCode.LeftShift or i.KeyCode == Enum.KeyCode.RightShift then
-        config.menuOpen = not config.menuOpen
-        updateUI()
+        config.menuOpen = not config.menuOpen; updateUI()
         local n = Instance.new("Message", game.CoreGui)
         n.Text = config.menuOpen and "メニュー表示" or "メニュー非表示"
         task.delay(1, function() n:Destroy() end)
@@ -85,7 +83,7 @@ btns.wall.MouseButton1Click:Connect(function() config.wallCheck = not config.wal
 btns.hide.MouseButton1Click:Connect(function() config.hideUI = not config.hideUI; updateUI() end)
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- ESP ---
+-- --- ESP描画ロジック ---
 local pESP = {}
 local function createESP(v)
     if v == LP then return nil end
@@ -107,7 +105,7 @@ end
 
 P.PlayerRemoving:Connect(function(p) if pESP[p] then pESP[p].Main:Destroy(); pESP[p] = nil end end)
 
--- --- メインエンジン ---
+-- --- メインエンジン (エイム＆Wall機能修正済) ---
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C or not LP.Character then return end
@@ -128,16 +126,16 @@ R.RenderStepped:Connect(function()
             local dist = (head.Position - C.CFrame.Position).Magnitude
             local pos, onScreen = C:WorldToViewportPoint(head.Position)
             
-            -- 壁チェックロジック
+            -- 壁判定の実行
             local rayParams = RaycastParams.new()
             rayParams.FilterDescendantsInstances = {LP.Character, char, C}
             rayParams.FilterType = Enum.RaycastFilterType.Exclude
             local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
             local isVisible = not result
 
-            -- --- ESPの表示条件 ---
-            -- wallCheckがOFF(Lキーで切り替え)なら、壁裏でも表示する
+            -- --- ESP表示条件 ---
             local shouldShowESP = onScreen and dist <= config.maxDistance and (not config.hideUI)
+            -- WallCheck(L)がONなら壁裏は見せない。OFFなら壁裏も表示。
             if config.wallCheck and not isVisible then shouldShowESP = false end
             
             if shouldShowESP then
@@ -153,12 +151,14 @@ R.RenderStepped:Connect(function()
                 end
             elseif pESP[v] then pESP[v].Main.Visible = false end
 
-            -- --- エイムのターゲット選定 ---
-            -- wallCheckがONの時は「見える敵だけ」、OFFの時は「壁裏も狙う」
-            local canAim = onScreen and dist <= config.maxDistance
-            if config.wallCheck and not isVisible then canAim = false end
+            -- --- エイムターゲット選定 (ここがWallの肝) ---
+            local aimPossible = onScreen and dist <= config.maxDistance
+            
+            -- 重要：Lキー(wallCheck)がONの時だけisVisibleを見る。OFFなら壁貫通。
+            local wallFilter = true
+            if config.wallCheck and not isVisible then wallFilter = false end
 
-            if canAim then
+            if aimPossible and wallFilter then
                 local mouseDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                 if mouseDist < nearestDist then
                     targetHead = head
@@ -169,6 +169,7 @@ R.RenderStepped:Connect(function()
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
+    -- エイム吸い付き
     if targetHead and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local pos, _ = C:WorldToViewportPoint(targetHead.Position)
         if mousemoverel then
@@ -176,6 +177,7 @@ R.RenderStepped:Connect(function()
         end
     end
 
+    -- オートファイヤ
     if config.autoFire and fireAllowed and mouse1press then
         mouse1press(); task.wait(0.01); mouse1release()
     end
