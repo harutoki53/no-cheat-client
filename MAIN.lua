@@ -7,7 +7,7 @@ local LP = P.LocalPlayer
 local config = {
     aimbot = true,      -- J: 最初からON
     autoFire = false,   -- K: 最初はOFF
-    wallCheck = true,   -- L: 最初はON (壁越し無効)
+    wallCheck = true,   -- L: 最初はON (壁越しでは動かない設定)
     hideUI = true,      -- H: 最初はOFF (ESP非表示)
     smooth = 0.4,
     pcFov = 800,
@@ -45,7 +45,7 @@ end
 local btns = {
     aim = createMenuBtn("AIM: ON", 50),
     fire = createMenuBtn("FIRE: OFF", 95),
-    wall = createMenuBtn("WALL: ON", 140),
+    wall = createMenuBtn("WALL FIL: ON", 140),
     hide = createMenuBtn("ESP: OFF", 185),
     close = createMenuBtn("CLOSE", 230)
 }
@@ -54,32 +54,27 @@ local function updateUI()
     menuFrame.Visible = config.menuOpen
     btns.aim.Text = "AIM: " .. (config.aimbot and "ON" or "OFF")
     btns.fire.Text = "FIRE: " .. (config.autoFire and "ON" or "OFF")
-    btns.wall.Text = "WALL: " .. (config.wallCheck and "ON" or "OFF")
+    -- WALL FIL: ON の時は「壁チェックをする（壁裏は撃たない）」
+    btns.wall.Text = "WALL FIL: " .. (config.wallCheck and "ON" or "OFF")
     btns.hide.Text = "ESP: " .. (config.hideUI and "OFF" or "ON")
 end
 
--- --- キー入力判定 (J, K, L, Hはサイレント / Shiftは通知あり) ---
+-- --- キー入力判定 ---
 U.InputBegan:Connect(function(i, gpe)
     if gpe then return end
-    
     if i.KeyCode == Enum.KeyCode.J then
-        config.aimbot = not config.aimbot
-        updateUI() -- 何も表示しない
+        config.aimbot = not config.aimbot; updateUI()
     elseif i.KeyCode == Enum.KeyCode.K then
-        config.autoFire = not config.autoFire
-        updateUI() -- 何も表示しない
+        config.autoFire = not config.autoFire; updateUI()
     elseif i.KeyCode == Enum.KeyCode.L then
-        config.wallCheck = not config.wallCheck
-        updateUI() -- 何も表示しない
+        config.wallCheck = not config.wallCheck; updateUI()
     elseif i.KeyCode == Enum.KeyCode.H then
-        config.hideUI = not config.hideUI
-        updateUI() -- 何も表示しない
+        config.hideUI = not config.hideUI; updateUI()
     elseif i.KeyCode == Enum.KeyCode.LeftShift or i.KeyCode == Enum.KeyCode.RightShift then
         config.menuOpen = not config.menuOpen
         updateUI()
-        -- Shiftの時だけ画面にメッセージを出す
         local n = Instance.new("Message", game.CoreGui)
-        n.Text = config.menuOpen and "メニューを表示しました" or "メニューを閉じました"
+        n.Text = config.menuOpen and "メニュー表示" or "メニュー非表示"
         task.delay(1, function() n:Destroy() end)
     end
 end)
@@ -90,7 +85,7 @@ btns.wall.MouseButton1Click:Connect(function() config.wallCheck = not config.wal
 btns.hide.MouseButton1Click:Connect(function() config.hideUI = not config.hideUI; updateUI() end)
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- ESP (元のコードを完全に復元) ---
+-- --- ESP ---
 local pESP = {}
 local function createESP(v)
     if v == LP then return nil end
@@ -112,7 +107,7 @@ end
 
 P.PlayerRemoving:Connect(function(p) if pESP[p] then pESP[p].Main:Destroy(); pESP[p] = nil end end)
 
--- --- メインエンジン (元のロジックを維持) ---
+-- --- メインエンジン ---
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C or not LP.Character then return end
@@ -133,16 +128,19 @@ R.RenderStepped:Connect(function()
             local dist = (head.Position - C.CFrame.Position).Magnitude
             local pos, onScreen = C:WorldToViewportPoint(head.Position)
             
+            -- 壁チェックロジック
             local rayParams = RaycastParams.new()
             rayParams.FilterDescendantsInstances = {LP.Character, char, C}
             rayParams.FilterType = Enum.RaycastFilterType.Exclude
             local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
             local isVisible = not result
 
-            -- ESP表示 (config.hideUIがfalseの時のみ)
-            local shouldShow = onScreen and dist <= config.maxDistance and (not config.hideUI)
+            -- --- ESPの表示条件 ---
+            -- wallCheckがOFF(Lキーで切り替え)なら、壁裏でも表示する
+            local shouldShowESP = onScreen and dist <= config.maxDistance and (not config.hideUI)
+            if config.wallCheck and not isVisible then shouldShowESP = false end
             
-            if shouldShow then
+            if shouldShowESP then
                 local esp = pESP[v] or createESP(v)
                 if esp then
                     esp.Main.Visible = true
@@ -155,11 +153,12 @@ R.RenderStepped:Connect(function()
                 end
             elseif pESP[v] then pESP[v].Main.Visible = false end
 
-            -- エイムターゲット選定 (壁判定がONならisVisibleを確認)
-            local aimVisible = true
-            if config.wallCheck then aimVisible = isVisible end
+            -- --- エイムのターゲット選定 ---
+            -- wallCheckがONの時は「見える敵だけ」、OFFの時は「壁裏も狙う」
+            local canAim = onScreen and dist <= config.maxDistance
+            if config.wallCheck and not isVisible then canAim = false end
 
-            if onScreen and aimVisible and dist <= config.maxDistance then
+            if canAim then
                 local mouseDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                 if mouseDist < nearestDist then
                     targetHead = head
