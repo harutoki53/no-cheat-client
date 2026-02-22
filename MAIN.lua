@@ -3,7 +3,7 @@ local R = game:GetService("RunService")
 local U = game:GetService("UserInputService")
 local LP = P.LocalPlayer
 
--- --- デフォルト設定 (ご要望通り) ---
+-- --- デフォルト設定 ---
 local config = {
     aimbot = true,      -- J: 最初からON
     autoFire = false,   -- K: 最初はOFF
@@ -12,16 +12,22 @@ local config = {
     smooth = 0.4,
     pcFov = 800,
     maxDistance = 500,
-    menuOpen = false    -- 初期は閉じ
+    menuOpen = false
 }
 
--- --- GUI (Harutoki Ultimate) ---
+-- --- GUI (元のコードのデザインを完全継承) ---
 local gui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 gui.Name = "HarutokiUltimate_Final"
 gui.IgnoreGuiInset = true; gui.ResetOnSpawn = false; gui.DisplayOrder = 9999
 
 for _, v in pairs(LP.PlayerGui:GetChildren()) do
     if v.Name == "HarutokiUltimate_Final" and v ~= gui then v:Destroy() end
+end
+
+local function isEnemy(v)
+    if not v or v == LP then return false end
+    if LP.Team and v.Team then return LP.Team ~= v.Team end
+    return true
 end
 
 -- --- 設定メニュー ---
@@ -44,18 +50,6 @@ local btns = {
     close = createMenuBtn("CLOSE", 230)
 }
 
--- --- 通知用ラベル (Shift時のみ使用) ---
-local notifyLabel = Instance.new("TextLabel", gui)
-notifyLabel.Size = UDim2.new(0, 200, 0, 30); notifyLabel.Position = UDim2.new(0.5, -100, 0.1, 0)
-notifyLabel.BackgroundTransparency = 1; notifyLabel.TextColor3 = Color3.new(1, 1, 1); notifyLabel.TextTransparency = 1
-notifyLabel.Font = Enum.Font.RobotoMono; notifyLabel.TextScaled = true
-
-local function showNotify(txt)
-    notifyLabel.Text = txt
-    notifyLabel.TextTransparency = 0
-    task.delay(1.5, function() notifyLabel.TextTransparency = 1 end)
-end
-
 local function updateUI()
     menuFrame.Visible = config.menuOpen
     btns.aim.Text = "AIM: " .. (config.aimbot and "ON" or "OFF")
@@ -64,36 +58,39 @@ local function updateUI()
     btns.hide.Text = "ESP: " .. (config.hideUI and "OFF" or "ON")
 end
 
--- キー入力処理
+-- --- キー入力判定 (J, K, L, Hはサイレント / Shiftは通知あり) ---
 U.InputBegan:Connect(function(i, gpe)
     if gpe then return end
+    
     if i.KeyCode == Enum.KeyCode.J then
         config.aimbot = not config.aimbot
-        updateUI() -- 通知なし
+        updateUI() -- 何も表示しない
     elseif i.KeyCode == Enum.KeyCode.K then
         config.autoFire = not config.autoFire
-        updateUI() -- 通知なし
+        updateUI() -- 何も表示しない
     elseif i.KeyCode == Enum.KeyCode.L then
         config.wallCheck = not config.wallCheck
-        updateUI() -- 通知なし
+        updateUI() -- 何も表示しない
     elseif i.KeyCode == Enum.KeyCode.H then
         config.hideUI = not config.hideUI
-        updateUI() -- 通知なし
+        updateUI() -- 何も表示しない
     elseif i.KeyCode == Enum.KeyCode.LeftShift or i.KeyCode == Enum.KeyCode.RightShift then
         config.menuOpen = not config.menuOpen
         updateUI()
-        showNotify(config.menuOpen and "MENU: OPEN" or "MENU: CLOSED") -- Shiftだけ通知
+        -- Shiftの時だけ画面にメッセージを出す
+        local n = Instance.new("Message", game.CoreGui)
+        n.Text = config.menuOpen and "メニューを表示しました" or "メニューを閉じました"
+        task.delay(1, function() n:Destroy() end)
     end
 end)
 
--- ボタンクリック
 btns.aim.MouseButton1Click:Connect(function() config.aimbot = not config.aimbot; updateUI() end)
 btns.fire.MouseButton1Click:Connect(function() config.autoFire = not config.autoFire; updateUI() end)
 btns.wall.MouseButton1Click:Connect(function() config.wallCheck = not config.wallCheck; updateUI() end)
 btns.hide.MouseButton1Click:Connect(function() config.hideUI = not config.hideUI; updateUI() end)
 btns.close.MouseButton1Click:Connect(function() config.menuOpen = false; updateUI() end)
 
--- --- ESPロジック (提示コードを完全継承) ---
+-- --- ESP (元のコードを完全に復元) ---
 local pESP = {}
 local function createESP(v)
     if v == LP then return nil end
@@ -113,15 +110,9 @@ local function createESP(v)
     return pESP[v]
 end
 
-local function isEnemy(v)
-    if not v or v == LP then return false end
-    if LP.Team and v.Team then return LP.Team ~= v.Team end
-    return true
-end
-
 P.PlayerRemoving:Connect(function(p) if pESP[p] then pESP[p].Main:Destroy(); pESP[p] = nil end end)
 
--- --- メインエンジン ---
+-- --- メインエンジン (元のロジックを維持) ---
 R.RenderStepped:Connect(function()
     local C = workspace.CurrentCamera
     if not C or not LP.Character then return end
@@ -142,15 +133,16 @@ R.RenderStepped:Connect(function()
             local dist = (head.Position - C.CFrame.Position).Magnitude
             local pos, onScreen = C:WorldToViewportPoint(head.Position)
             
-            -- 壁判定
             local rayParams = RaycastParams.new()
             rayParams.FilterDescendantsInstances = {LP.Character, char, C}
             rayParams.FilterType = Enum.RaycastFilterType.Exclude
             local result = workspace:Raycast(C.CFrame.Position, (head.Position - C.CFrame.Position).Unit * dist, rayParams)
             local isVisible = not result
 
-            -- ESP表示 (config.hideUIがfalse、かつonScreenの時)
-            if onScreen and dist <= config.maxDistance and (not config.hideUI) then
+            -- ESP表示 (config.hideUIがfalseの時のみ)
+            local shouldShow = onScreen and dist <= config.maxDistance and (not config.hideUI)
+            
+            if shouldShow then
                 local esp = pESP[v] or createESP(v)
                 if esp then
                     esp.Main.Visible = true
@@ -163,7 +155,7 @@ R.RenderStepped:Connect(function()
                 end
             elseif pESP[v] then pESP[v].Main.Visible = false end
 
-            -- エイムターゲット選定
+            -- エイムターゲット選定 (壁判定がONならisVisibleを確認)
             local aimVisible = true
             if config.wallCheck then aimVisible = isVisible end
 
@@ -178,7 +170,6 @@ R.RenderStepped:Connect(function()
         elseif pESP[v] then pESP[v].Main.Visible = false end
     end
 
-    -- エイム実行
     if targetHead and config.aimbot and U:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local pos, _ = C:WorldToViewportPoint(targetHead.Position)
         if mousemoverel then
@@ -186,7 +177,6 @@ R.RenderStepped:Connect(function()
         end
     end
 
-    -- 発射
     if config.autoFire and fireAllowed and mouse1press then
         mouse1press(); task.wait(0.01); mouse1release()
     end
