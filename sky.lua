@@ -1,11 +1,10 @@
--- [[ 漆念のコントラスト版：Pキー切替 ＆ 超高速監視 ]]
+-- [[ 漆念のコントラスト版：強制キー検知 ＆ 超速監視 ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
-local UIS = game:GetService("UserInputService")
-local isTransparent = false -- 透明モードのフラグ
+local isTransparent = false
 
--- 適用したいID
+-- 1. 設定データ
 local config = {
     Ids = {
         Ft = "rbxassetid://72529916859362",
@@ -17,20 +16,22 @@ local config = {
     }
 }
 
--- ライティングを強制固定する関数（毎フレーム実行用）
-local function ForceApply()
-    -- 1. 空の固定
-    local sky = lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", lighting)
-    if sky.SkyboxFt ~= config.Ids.Ft then
-        sky.SkyboxFt = config.Ids.Ft
-        sky.SkyboxBk = config.Ids.Bk
-        sky.SkyboxRt = config.Ids.Rt
-        sky.SkyboxLf = config.Ids.Lf
-        sky.SkyboxUp = config.Ids.Up
-        sky.SkyboxDn = config.Ids.Dn
+-- 2. 毎フレーム実行する「超・強制」設定
+local function SuperForce()
+    -- 空の維持（Skyオブジェクトが消されたら即座に作り直す）
+    local sky = lighting:FindFirstChildOfClass("Sky")
+    if not sky then
+        sky = Instance.new("Sky", lighting)
     end
+    
+    sky.SkyboxFt = config.Ids.Ft
+    sky.SkyboxBk = config.Ids.Bk
+    sky.SkyboxRt = config.Ids.Rt
+    sky.SkyboxLf = config.Ids.Lf
+    sky.SkyboxUp = config.Ids.Up
+    sky.SkyboxDn = config.Ids.Dn
 
-    -- 2. ライティングの強制固定
+    -- ライティングの維持
     lighting.Brightness = 0
     lighting.ClockTime = 14
     lighting.OutdoorAmbient = Color3.new(0, 0, 0)
@@ -38,14 +39,14 @@ local function ForceApply()
     lighting.ExposureCompensation = 1.2
 end
 
--- 建造物を処理する関数（モードによって黒か透明か分ける）
+-- 3. 建造物の処理（黒 or 透明）
 local function UpdateBuildings()
     for _, obj in pairs(game.Workspace:GetDescendants()) do
         if obj:IsA("BasePart") and not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
             if isTransparent then
-                obj.Transparency = 1 -- 透明モード
+                obj.Transparency = 1
             else
-                obj.Transparency = 0 -- 黒モード
+                obj.Transparency = 0
                 obj.Color = Color3.new(0, 0, 0)
                 obj.Material = Enum.Material.SmoothPlastic
             end
@@ -57,27 +58,27 @@ local function UpdateBuildings()
     end
 end
 
--- Pキーで切り替え
-UIS.InputBegan:Connect(function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.P then
+-- 4. キー入力を「マウス・キーボード直接検知」に変える
+-- UserInputServiceが効かないゲーム向けの別ルート
+game:GetService("RunService").Stepped:Connect(function()
+    -- Pキー (KeyCode 112 は 'p' の場合があるが、Enumで指定)
+    if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.P) then
+        task.wait(0.2) -- 連続反応防止
         isTransparent = not isTransparent
-        print("Mode Switched: " .. (isTransparent and "Transparent" or "Black"))
-        UpdateBuildings() -- キーを押した瞬間に一回更新
+        print("Toggle: " .. tostring(isTransparent))
+        UpdateBuildings()
     end
+    
+    -- 毎フレーム実行
+    pcall(SuperForce)
 end)
 
--- 実行開始
-print("--- Anti-Reset System: Press 'P' to Toggle ---")
-
--- 超高速監視ループ（RenderStepped = 画面が描画されるたびに実行）
-game:GetService("RunService").RenderStepped:Connect(function()
-    pcall(ForceApply)
-end)
-
--- 建物は重いので、1秒ごとに新しく出たパーツをチェック
+-- 建物だけ1秒おきにチェック（新しく出現する建物対策）
 task.spawn(function()
     while true do
         pcall(UpdateBuildings)
         task.wait(1)
     end
 end)
+
+print("--- System Ready: Press P to Toggle ---")
