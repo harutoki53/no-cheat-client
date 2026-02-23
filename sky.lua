@@ -1,4 +1,4 @@
--- [[ 最終制圧版：霧消去・全パーツ漆黒・超高速復旧 ]]
+-- [[ 漆念：極限制圧版（全環境破壊・漆黒・Pキー絶対動作） ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -18,72 +18,78 @@ local config = {
     }
 }
 
--- 1. ライティングの「完全破壊」と空の維持
-RunService.RenderStepped:Connect(function()
-    -- 空を最優先で維持
-    local sky = lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", lighting)
-    if sky.SkyboxFt ~= config.Ids.Ft then
-        sky.SkyboxFt = config.Ids.Ft
-        sky.SkyboxBk = config.Ids.Bk
-        sky.SkyboxRt = config.Ids.Rt
-        sky.SkyboxLf = config.Ids.Lf
-        sky.SkyboxUp = config.Ids.Up
-        sky.SkyboxDn = config.Ids.Dn
+-- 1. 環境破壊：ゲーム側のエフェクトを物理的に消し続ける
+local function EraseEnvironment()
+    -- 霧や青みの原因を破壊
+    for _, obj in pairs(lighting:GetChildren()) do
+        if obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("Clouds") or obj:IsA("PostEffect") then
+            obj:Destroy()
+        end
     end
-
-    -- ゲーム側の「白飛び」と「霧」を毎フレーム殺す
-    lighting.Brightness = 0                -- 太陽光カット
+    -- 新しい空を強制生成
+    local sky = Instance.new("Sky", lighting)
+    sky.SkyboxFt = config.Ids.Ft
+    sky.SkyboxBk = config.Ids.Bk
+    sky.SkyboxRt = config.Ids.Rt
+    sky.SkyboxLf = config.Ids.Lf
+    sky.SkyboxUp = config.Ids.Up
+    sky.SkyboxDn = config.Ids.Dn
+    
+    -- ライティングを物理的な限界まで暗くする
+    lighting.Brightness = 0
+    lighting.ClockTime = 0
+    lighting.ExposureCompensation = -1 -- マイナス値で白飛びを完全に殺す
+    lighting.FogEnd = 9e9
     lighting.OutdoorAmbient = Color3.new(0,0,0)
     lighting.Ambient = Color3.new(0,0,0)
-    lighting.GlobalShadows = true          -- 影を有効にして暗さを強調
-    lighting.ClockTime = 0                 -- 真夜中に固定
-    lighting.FogEnd = 100000               -- 霧を遠くに飛ばす
-    lighting.FogStart = 100000
-    lighting.Atmosphere:Destroy() pcall(function() end) -- 大気エフェクト（白みの原因）を削除
-end)
+end
 
--- 2. 全オブジェクトの漆黒化（条件を排除）
+-- 2. オブジェクト制圧（塊も的も逃さない）
 local function ForceBlackout()
     for _, obj in pairs(game.Workspace:GetDescendants()) do
         if not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
-            -- パーツ類
             if obj:IsA("BasePart") then
                 if _G.SkyIsTransparent then
                     obj.Transparency = 1
                 else
-                    -- 「もともと透明な塊」も含めて、画面内の全パーツを強制的に黒くする
+                    -- すべてを黒に。さらにMaterialをNeon以外にして発光を殺す
                     obj.Color = Color3.new(0, 0, 0)
                     obj.Material = Enum.Material.SmoothPlastic
-                    obj.Reflectance = 0
                     obj.Transparency = 0
+                    obj.Reflectance = 0
                 end
-            -- デカール・テクスチャ・メッシュ装飾
-            elseif obj:IsA("Texture") or obj:IsA("Decal") or obj:IsA("SpecialMesh") then
-                obj.Transparency = 1
-            -- パーティクル・光
-            elseif obj:IsA("ParticleEmitter") or obj:IsA("Light") or obj:IsA("PostEffect") then
-                if obj:IsA("Light") then obj.Enabled = false
-                else obj:Destroy() pcall(function() end) end -- エフェクト類は破壊
+            elseif obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("SpecialMesh") then
+                obj.Transparency = 1 -- 的の模様や巨大なテクスチャを消す
+            elseif obj:IsA("ParticleEmitter") or obj:IsA("Light") then
+                if obj:IsA("Light") then obj.Enabled = false else obj.Enabled = false end
             end
         end
     end
 end
 
--- 3. Pキー検知（接続ミス修正）
-if _G.SkyConn then _G.SkyConn:Disconnect() end
-_G.SkyConn = UIS.InputBegan:Connect(function(input, processed)
-    if input.KeyCode == Enum.KeyCode.P then
-        _G.SkyIsTransparent = not _G.SkyIsTransparent
-        ForceBlackout()
+-- 3. Pキー：イベントではなくループで監視（絶対反応）
+task.spawn(function()
+    while true do
+        if UIS:IsKeyDown(Enum.KeyCode.P) then
+            _G.SkyIsTransparent = not _G.SkyIsTransparent
+            print("Toggle Mode")
+            ForceBlackout()
+            task.wait(0.5) -- 連続反応防止
+        end
+        task.wait(0.05)
     end
 end)
 
--- 超高速ループで黒さを維持
+-- 4. 実行ループ（超高速）
+RunService.RenderStepped:Connect(function()
+    pcall(EraseEnvironment)
+end)
+
 task.spawn(function()
     while true do
         pcall(ForceBlackout)
-        task.wait(0.5) -- 監視速度を2倍にアップ
+        task.wait(0.5)
     end
 end)
 
-print("--- Ultimate Blackout System Online ---")
+print("--- Ultimate Suppression System Online ---")
