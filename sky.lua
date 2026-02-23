@@ -1,10 +1,9 @@
--- [[ 漆念のコントラスト完全版：Pキー強制反応 ＆ 視覚バグ修正 ]]
+-- [[ 漆念のコントラスト真・完全版：不可視オブジェクト除外モデル ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
 local UIS = game:GetService("UserInputService")
 
--- モード管理用のグローバル変数
 _G.SkyIsTransparent = _G.SkyIsTransparent or false 
 
 local config = {
@@ -18,7 +17,7 @@ local config = {
     }
 }
 
--- 1. ライティングと空の「超・強制」固定（毎フレーム）
+-- 1. ライティング固定（変更なし）
 local function ForceApply()
     local sky = lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", lighting)
     if sky.SkyboxFt ~= config.Ids.Ft then
@@ -29,67 +28,54 @@ local function ForceApply()
         sky.SkyboxUp = config.Ids.Up
         sky.SkyboxDn = config.Ids.Dn
     end
-
     lighting.Brightness = 0
     lighting.ClockTime = 14
     lighting.OutdoorAmbient = Color3.new(0, 0, 0)
     lighting.Ambient = Color3.new(0, 0, 0)
-    lighting.ExposureCompensation = 1.1 -- 1.2より少し下げてバグを抑制
-    lighting.FogEnd = 1e6
+    lighting.ExposureCompensation = 1.1
 end
 
--- 2. 全オブジェクトの処理（トゲトゲ対策強化）
+-- 2. 建造物処理（ここを大幅修正！）
 local function UpdateBuildings()
     for _, obj in pairs(game.Workspace:GetDescendants()) do
-        -- 自分のキャラ以外を対象
         if obj:IsA("BasePart") and not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
             if _G.SkyIsTransparent then
-                -- 透明モード：すべて消す
-                if obj.Transparency ~= 1 then obj.Transparency = 1 end
+                obj.Transparency = 1
             else
-                -- 黒モード：見た目を黒く、形を保つ
-                if obj.Transparency ~= 0 or obj.Color ~= Color3.new(0,0,0) then
-                    obj.Transparency = 0
+                -- 【重要】もともと透明なパーツ（見えない壁など）は黒くしない！
+                -- 透明度が0.1以上あるものは、意図的に隠されているので無視します
+                if obj.Transparency < 0.1 then
                     obj.Color = Color3.new(0, 0, 0)
                     obj.Material = Enum.Material.SmoothPlastic
                     obj.Reflectance = 0
                 end
             end
-        -- デカール、テクスチャ、特殊メッシュをすべて透明化
         elseif obj:IsA("Texture") or obj:IsA("Decal") or obj:IsA("SpecialMesh") then
             obj.Transparency = 1
-        -- パーティクル（謎の点々やエフェクト）を停止
-        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
-            obj.Enabled = false
-        -- 全ての光源をカット
-        elseif obj:IsA("Light") then
+        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Light") then
             obj.Enabled = false
         end
     end
 end
 
--- 3. Pキー検知（processedを無視して強制的に拾う設定）
-UIS.InputBegan:Connect(function(input)
+-- 3. Pキー検知（接続を一度切ってから再接続して重複防止）
+if _G.SkyConn then _G.SkyConn:Disconnect() end
+_G.SkyConn = UIS.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.P then
         _G.SkyIsTransparent = not _G.SkyIsTransparent
-        print("Mode Toggled! Transparent: " .. tostring(_G.SkyIsTransparent))
-        -- モード切り替え時に一気に全スキャン
+        print("Mode Toggle: " .. tostring(_G.SkyIsTransparent))
         UpdateBuildings()
     end
 end)
 
--- 4. 実行ループ
-print("--- Final Version Loaded: Press 'P' to Toggle ---")
-
--- ライティングは最速で維持
+-- 4. 実行
 game:GetService("RunService").RenderStepped:Connect(function()
     pcall(ForceApply)
 end)
 
--- 建物や新パーツは1秒ごとにチェック（負荷対策）
 task.spawn(function()
     while true do
         pcall(UpdateBuildings)
-        task.wait(1)
+        task.wait(2) -- 負荷軽減のため2秒間隔に
     end
 end)
