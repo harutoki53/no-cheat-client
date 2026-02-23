@@ -1,4 +1,4 @@
--- [[ 真・強制ブラックアウト：全オブジェクト完全漆黒化 ]]
+-- [[ 最終制圧版：霧消去・全パーツ漆黒・超高速復旧 ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -18,8 +18,9 @@ local config = {
     }
 }
 
--- 1. 空の「絶対強制」維持
+-- 1. ライティングの「完全破壊」と空の維持
 RunService.RenderStepped:Connect(function()
+    -- 空を最優先で維持
     local sky = lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", lighting)
     if sky.SkyboxFt ~= config.Ids.Ft then
         sky.SkyboxFt = config.Ids.Ft
@@ -30,61 +31,59 @@ RunService.RenderStepped:Connect(function()
         sky.SkyboxDn = config.Ids.Dn
     end
 
-    -- ライティングを極限まで暗くし、ツヤだけで地形を出す
-    lighting.Brightness = 3 -- 反射（ツヤ）を強く出すために輝度を上げる
-    lighting.ClockTime = 14
-    lighting.ExposureCompensation = 1.0
-    lighting.Ambient = Color3.new(0, 0, 0)
-    lighting.OutdoorAmbient = Color3.new(0, 0, 0)
+    -- ゲーム側の「白飛び」と「霧」を毎フレーム殺す
+    lighting.Brightness = 0                -- 太陽光カット
+    lighting.OutdoorAmbient = Color3.new(0,0,0)
+    lighting.Ambient = Color3.new(0,0,0)
+    lighting.GlobalShadows = true          -- 影を有効にして暗さを強調
+    lighting.ClockTime = 0                 -- 真夜中に固定
+    lighting.FogEnd = 100000               -- 霧を遠くに飛ばす
+    lighting.FogStart = 100000
+    lighting.Atmosphere:Destroy() pcall(function() end) -- 大気エフェクト（白みの原因）を削除
 end)
 
--- 2. 「的」も「床」も「壁」もすべて黒くする関数
+-- 2. 全オブジェクトの漆黒化（条件を排除）
 local function ForceBlackout()
     for _, obj in pairs(game.Workspace:GetDescendants()) do
-        -- 自分のキャラ以外をすべて対象
-        if obj:IsA("BasePart") and not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
-            if _G.SkyIsTransparent then
-                obj.Transparency = 1
-            else
-                -- すべてを完全な黒に強制（的などの赤いパーツも逃さない）
-                obj.Color = Color3.new(0, 0, 0)
-                -- 鏡面反射（Reflectance）を設定して、空の光で地形の形だけを見せる
-                obj.Material = Enum.Material.Glass 
-                obj.Reflectance = 0.2 -- この「0.2」が地形把握の鍵（ツヤ）
-                obj.Transparency = 0
-            end
-        -- 画像やテクスチャ（的のマークなど）をすべて消去
-        elseif obj:IsA("Texture") or obj:IsA("Decal") or obj:IsA("MeshPart") or obj:IsA("SpecialMesh") then
-            if not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
-                if obj:IsA("BasePart") then
-                    obj.Color = Color3.new(0,0,0) -- メッシュパーツも黒く
-                elseif obj:IsA("Texture") or obj:IsA("Decal") then
-                    obj.Transparency = 1 -- 的のマークなどは消す
+        if not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
+            -- パーツ類
+            if obj:IsA("BasePart") then
+                if _G.SkyIsTransparent then
+                    obj.Transparency = 1
+                else
+                    -- 「もともと透明な塊」も含めて、画面内の全パーツを強制的に黒くする
+                    obj.Color = Color3.new(0, 0, 0)
+                    obj.Material = Enum.Material.SmoothPlastic
+                    obj.Reflectance = 0
+                    obj.Transparency = 0
                 end
+            -- デカール・テクスチャ・メッシュ装飾
+            elseif obj:IsA("Texture") or obj:IsA("Decal") or obj:IsA("SpecialMesh") then
+                obj.Transparency = 1
+            -- パーティクル・光
+            elseif obj:IsA("ParticleEmitter") or obj:IsA("Light") or obj:IsA("PostEffect") then
+                if obj:IsA("Light") then obj.Enabled = false
+                else obj:Destroy() pcall(function() end) end -- エフェクト類は破壊
             end
-        -- 光源とエフェクトを完全カット
-        elseif obj:IsA("Light") or obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
-            obj.Enabled = false
         end
     end
 end
 
--- 3. Pキー検知
+-- 3. Pキー検知（接続ミス修正）
 if _G.SkyConn then _G.SkyConn:Disconnect() end
 _G.SkyConn = UIS.InputBegan:Connect(function(input, processed)
     if input.KeyCode == Enum.KeyCode.P then
         _G.SkyIsTransparent = not _G.SkyIsTransparent
-        print("Switching Mode...")
         ForceBlackout()
     end
 end)
 
--- 常に新しいパーツを黒くし続ける
+-- 超高速ループで黒さを維持
 task.spawn(function()
     while true do
         pcall(ForceBlackout)
-        task.wait(1)
+        task.wait(0.5) -- 監視速度を2倍にアップ
     end
 end)
 
-print("--- Total Blackout System Online ---")
+print("--- Ultimate Blackout System Online ---")
