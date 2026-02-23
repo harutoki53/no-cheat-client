@@ -1,41 +1,69 @@
--- [[ 漆念のコントラスト版：カスタムスカイ ＆ 建物黒化 ]]
+-- [[ 漆念のコントラスト版：監視・自動修復機能付き ]]
 local lighting = game:GetService("Lighting")
 
--- 1. 空の書き換え（高輝度設定）
-for _, v in pairs(lighting:GetChildren()) do
-    if v:IsA("Sky") then v:Destroy() end
+-- 適用したいIDと設定
+local config = {
+    Ids = {
+        Ft = "rbxassetid://72529916859362",
+        Bk = "rbxassetid://89515271903361",
+        Rt = "rbxassetid://83741654156826",
+        Lf = "rbxassetid://116760075528148",
+        Up = "rbxassetid://119892967613407",
+        Dn = "rbxassetid://123559461938777"
+    }
+}
+
+-- メインの処理関数
+local function ForceApply()
+    -- 1. 空の固定
+    local sky = lighting:FindFirstChildOfClass("Sky")
+    if not sky then
+        sky = Instance.new("Sky", lighting)
+    end
+    if sky.SkyboxFt ~= config.Ids.Ft then
+        sky.SkyboxFt = config.Ids.Ft
+        sky.SkyboxBk = config.Ids.Bk
+        sky.SkyboxRt = config.Ids.Rt
+        sky.SkyboxLf = config.Ids.Lf
+        sky.SkyboxUp = config.Ids.Up
+        sky.SkyboxDn = config.Ids.Dn
+    end
+
+    -- 2. ライティングの強制固定
+    lighting.Brightness = 0
+    lighting.ClockTime = 14
+    lighting.OutdoorAmbient = Color3.new(0, 0, 0)
+    lighting.Ambient = Color3.new(0, 0, 0)
+    lighting.ExposureCompensation = 1.2
 end
 
-local sky = Instance.new("Sky", lighting)
-sky.SkyboxFt = "rbxassetid://72529916859362"
-sky.SkyboxBk = "rbxassetid://89515271903361"
-sky.SkyboxRt = "rbxassetid://83741654156826"
-sky.SkyboxLf = "rbxassetid://116760075528148"
-sky.SkyboxUp = "rbxassetid://119892967613407"
-sky.SkyboxDn = "rbxassetid://123559461938777"
-
--- 2. ライティングの追い込み設定
-lighting.Brightness = 0               -- 太陽の直接光をカット
-lighting.ClockTime = 14               -- 昼に設定（空の色を出すため）
-lighting.OutdoorAmbient = Color3.new(0, 0, 0) -- 建物に当たる外光をゼロに
-lighting.Ambient = Color3.new(0, 0, 0)        -- 環境光をゼロに（これで影が死にます）
-lighting.ExposureCompensation = 1.2   -- 露出を上げて、空の画像だけを強制発光させる
-lighting.FogEnd = 1e6
-
--- 3. 建造物を完全に漆黒へ
-for _, obj in pairs(game.Workspace:GetDescendants()) do
-    if obj:IsA("BasePart") then
-        if not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
-            obj.Color = Color3.new(0, 0, 0) -- 漆黒に戻す
-            obj.Material = Enum.Material.SmoothPlastic
-            obj.Reflectance = 0
-            obj.CastShadow = true -- 影を落としてより暗く
+-- 3. 建造物の黒化（これは重いので1回 or たまに実行）
+local function BlackenBuildings()
+    for _, obj in pairs(game.Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
+            if obj.Color ~= Color3.new(0, 0, 0) then
+                obj.Color = Color3.new(0, 0, 0)
+                obj.Material = Enum.Material.SmoothPlastic
+                obj.Reflectance = 0
+            end
+        elseif (obj:IsA("Texture") or obj:IsA("Decal")) and obj.Transparency ~= 1 then
+            obj.Transparency = 1
+        elseif obj:IsA("Light") and obj.Enabled == true then
+            obj.Enabled = false
         end
-    elseif obj:IsA("Texture") or obj:IsA("Decal") then
-        obj.Transparency = 1
-    elseif obj:IsA("Light") then
-        obj.Enabled = false -- 街灯などもすべてカット
     end
 end
 
-print("--- Deep Dark Contrast Loaded! ---")
+-- 実行開始
+print("--- Anti-Reset Sky System Activated ---")
+
+-- 無限ループで監視し続ける（これが重要！）
+task.spawn(function()
+    while true do
+        ForceApply()
+        -- 建物は負荷が高いので、5秒に1回チェック
+        -- もし新しい建物が出てきてもこれで黒くなります
+        BlackenBuildings() 
+        task.wait(1) -- 1秒ごとにチェック
+    end
+end)
