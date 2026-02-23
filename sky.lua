@@ -1,4 +1,4 @@
--- [[ 漆念：地形視認 ＆ 空強制描画 完全版 ]]
+-- [[ 漆念：最終・完全版（多重Sky削除 ＆ 環境完全制圧） ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -15,57 +15,73 @@ local config = {
     }
 }
 
--- 環境の徹底固定
-local function EnforceEnv()
-    -- 霧・大気・画面の色味補正を全て消去
-    for _, v in pairs(lighting:GetChildren()) do
-        if v:IsA("Atmosphere") or v:IsA("Clouds") or v:IsA("PostEffect") or v:IsA("ColorCorrectionEffect") then
-            v:Destroy()
+-- 1. 環境と空の「完全上書き」関数
+local function ForceSanitizeEnvironment()
+    -- 既存のSky, Atmosphere, Cloudsをすべて消去して「真っさら」にする
+    for _, obj in pairs(lighting:GetChildren()) do
+        if obj:IsA("Sky") or obj:IsA("Atmosphere") or obj:IsA("Clouds") or obj:IsA("PostEffect") then
+            obj:Destroy()
         end
     end
 
-    -- 空を生成・維持
-    local sky = lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", lighting)
+    -- 新しいSkyを1つだけ作成
+    local sky = Instance.new("Sky", lighting)
     sky.SkyboxFt = config.Ids.Ft
     sky.SkyboxBk = config.Ids.Bk
     sky.SkyboxRt = config.Ids.Rt
     sky.SkyboxLf = config.Ids.Lf
     sky.SkyboxUp = config.Ids.Up
     sky.SkyboxDn = config.Ids.Dn
+    sky.SunAngularSize = 0 -- 太陽を消す
+    sky.MoonAngularSize = 0 -- 月を消す
 
-    -- ライティング調整（地形が見えるように輝度を上げる）
-    lighting.Brightness = 5
+    -- ライティングを漆黒かつ視認性高く設定
+    lighting.Brightness = 6               -- 反射を強めて角を見せる
     lighting.ClockTime = 14
-    lighting.ExposureCompensation = 0.5
+    lighting.ExposureCompensation = -0.2  -- 「黒くない」対策：露出を下げて引き締める
     lighting.Ambient = Color3.new(0, 0, 0)
     lighting.OutdoorAmbient = Color3.new(0, 0, 0)
-    lighting.FogEnd = 1e6
+    lighting.FogEnd = 1e6                 -- 霧を消去
 end
 
--- 全パーツの黒化（エッジ強調）
-local function Blackout()
+-- 2. 全オブジェクトの漆黒化（地形エッジ強調）
+local function ApplyBlackout()
     for _, obj in pairs(game.Workspace:GetDescendants()) do
         if not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
             if obj:IsA("BasePart") then
                 if obj.Transparency < 0.1 then
                     obj.Color = Color3.new(0, 0, 0)
                     obj.Material = Enum.Material.Plastic
-                    obj.Reflectance = 0.05 -- 角を光らせる
+                    obj.Reflectance = 0.04 -- わずかな反射で角を浮かび上がらせる
                     obj.Transparency = 0
                 end
-                -- 巨大な空隠しパーツを消す
+                -- 巨大な空隠しパーツの排除
                 if obj.Size.Magnitude > 1500 then obj.Transparency = 1 end
             elseif obj:IsA("Texture") or obj:IsA("Decal") or obj:IsA("SpecialMesh") then
                 obj.Transparency = 1
+            elseif obj:IsA("Light") or obj:IsA("ParticleEmitter") then
+                obj.Enabled = false
             end
         end
     end
 end
 
-RunService.Heartbeat:Connect(EnforceEnv)
+-- 3. 実行（Heartbeatでゲーム側のスクリプトに競り勝つ）
+RunService.Heartbeat:Connect(function()
+    -- 空が存在しない、または1つより多い場合にリセット
+    local skies = 0
+    for _, v in pairs(lighting:GetChildren()) do if v:IsA("Sky") then skies = skies + 1 end end
+    
+    if skies ~= 1 then
+        pcall(ForceSanitizeEnvironment)
+    end
+end)
+
 task.spawn(function()
     while true do
-        pcall(Blackout)
+        pcall(ApplyBlackout)
         task.wait(1)
     end
 end)
+
+print("--- Ultimate Environment Overwrite System Online ---")
