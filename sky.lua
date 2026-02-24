@@ -1,69 +1,55 @@
--- [[ 漆念：修正版（空の強制適用モデル） ]]
-repeat task.wait() until game:IsLoaded()
-
+-- [[ 漆念：視認性重視・黒コントラストモデル ]]
 local lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 
--- 1. 空の設定（ID形式の修正と重複生成防止）
+-- 1. 空の変更（新ID固定）
 local function ApplySky()
-    local sky = lighting:FindFirstChild("CustomSky") or lighting:FindFirstChildOfClass("Sky")
-    
-    if not sky then
-        sky = Instance.new("Sky")
-        sky.Name = "CustomSky"
-        sky.Parent = lighting
-    end
-    
-    -- IDの適用（http://www.roblox.com/asset/?id= 形式が最も安定します）
-    local prefix = "http://www.roblox.com/asset/?id="
-    
-    if sky.SkyboxFt ~= prefix .. "72529916859362" then
-        sky.SkyboxFt = prefix .. "72529916859362"
-        sky.SkyboxBk = prefix .. "74808508289471"
-        sky.SkyboxRt = prefix .. "103546862048950"
-        sky.SkyboxLf = prefix .. "116760075528148"
-        sky.SkyboxUp = prefix .. "119892967613407"
-        sky.SkyboxDn = prefix .. "123559461938777"
-        sky.SunTextureId = ""
-        sky.SunAngularSize = 0 -- 太陽を完全に消す場合に有効
-    end
+    local sky = lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", lighting)
+    sky.SkyboxFt = "rbxassetid://72529916859362"
+    sky.SkyboxBk = "rbxassetid://74808508289471"
+    sky.SkyboxRt = "rbxassetid://103546862048950"
+    sky.SkyboxLf = "rbxassetid://116760075528148"
+    sky.SkyboxUp = "rbxassetid://119892967613407"
+    sky.SkyboxDn = "rbxassetid://123559461938777"
+    sky.SunTextureId = ""
 end
 
--- 2. ライティングと地形の黒化
-local function ApplyWorldEffect()
+-- 2. 地形の調整（「ちょっと明るい」視認性を確保）
+local function ApplyBalancedBlack()
+    -- ライティング：影を引き締めつつ、光を反射させる
     lighting.FogEnd = 100000
-    lighting.Brightness = 5
-    lighting.ClockTime = 14
+    lighting.Brightness = 4              -- 輝度を上げて反射を強くする
+    lighting.ClockTime = 14              -- 昼間に戻して光を当てる
+    lighting.ExposureCompensation = 0.3  -- 露出を少し上げて全体を「見える」明るさに
     lighting.Ambient = Color3.new(0, 0, 0)
-    lighting.OutdoorAmbient = Color3.new(0, 0, 0)
+    lighting.OutdoorAmbient = Color3.new(0.05, 0.05, 0.05) -- わずかに環境光を入れて真っ暗を防ぐ
 
-    for _, obj in pairs(workspace:GetDescendants()) do
-        -- 自分のキャラ以外を対象にする
-        if not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
-            if obj:IsA("BasePart") and obj.Transparency < 0.1 then
-                obj.Color = Color3.new(0, 0, 0)
+    for _, obj in pairs(game.Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and not obj:IsDescendantOf(game.Players.LocalPlayer.Character) then
+            -- 地形を黒くするが、反射で形を見せる
+            if obj.Transparency < 0.1 then
+                obj.Color = Color3.new(0.01, 0.01, 0.01) -- 完全な0より、ごく微かにグレー
                 obj.Material = Enum.Material.Plastic
-                obj.Reflectance = 0.04
-            elseif obj:IsA("Texture") or obj:IsA("Decal") then
-                obj.Transparency = 1
-            elseif obj:IsA("Atmosphere") or obj:IsA("Clouds") then
-                obj.Parent = nil -- Destroyより安全な場合があります
+                obj.Reflectance = 0.08 -- 反射をアップ。角や面が空の光を拾って白く見える
             end
+        elseif obj:IsA("Texture") or obj:IsA("Decal") then
+            obj.Transparency = 1
+        elseif obj:IsA("Atmosphere") or obj:IsA("Clouds") then
+            obj:Destroy()
         end
     end
 end
 
--- 3. 実行（ここが重要です）
--- 元のコードの pcall(ApplySky) は「関数の実行結果」を渡してしまっていたため動作していませんでした
-RunService.RenderStepped:Connect(function()
-    pcall(ApplySky)
-end)
+-- 3. 実行と維持
+pcall(ApplySky)
+pcall(ApplyBalancedBlack)
 
-task.spawn(function()
-    while true do
-        pcall(ApplyWorldEffect)
-        task.wait(2) -- 負荷軽減のため少し間隔を広げています
+-- 空と明るさを維持
+RunService.Heartbeat:Connect(function()
+    local sky = lighting:FindFirstChildOfClass("Sky")
+    if not sky or sky.SkyboxBk ~= "rbxassetid://74808508289471" then
+        pcall(ApplySky)
     end
 end)
 
-print("Skybox fixed and World effect applied!")
+print("Balanced Black System Applied!")
