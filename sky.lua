@@ -1,4 +1,4 @@
--- [[ 漆念：最終完成版 (空のモヤ完全排除・クッキリ漆黒質感) ]]
+-- [[ 漆念：透明度保護・漆黒質感モデル ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -12,69 +12,59 @@ local NEW_RT = "rbxassetid://111173485460565"
 
 local isTransparent = false
 
--- 1. 空の周りの「モヤ」を徹底排除
+-- 1. 環境クリーンアップ
 local function CleanEnvironment()
-    -- 雲（Clouds）を透明にして完全に黙らせる（Destroyしないのでエラーも出ません）
     for _, obj in pairs(game.Workspace:GetDescendants()) do
-        if obj:IsA("Clouds") then
-            obj.Enabled = false
-            obj.Cover = 0
-            obj.Density = 0
-        end
+        if obj:IsA("Clouds") then obj.Enabled = false end
     end
-
-    -- 視界をグレーにする大気エフェクトを即座に消去
     for _, obj in pairs(lighting:GetChildren()) do
-        if obj:IsA("Atmosphere") or obj:IsA("Sky") then
-            if obj.Name ~= "CustomSky" then obj:Destroy() end
-        end
+        if obj:IsA("Atmosphere") then obj:Destroy() end
     end
-
-    -- 霧を限界まで遠ざけて「クリアな夜」を作る
     lighting.FogEnd = 1000000
-    lighting.FogStart = 0
 end
 
--- 2. 自然な夜の明るさ（クッキリ見える設定）
+-- 2. ライティング設定（夜の質感を出しつつ形を見せる）
 local function ApplyLighting()
-    lighting.ClockTime = 2 -- 深夜
-    lighting.Brightness = 2 -- パーツの輪郭を出すための輝度
-    lighting.GlobalShadows = true -- 影で立体感を出す
+    lighting.ClockTime = 2
+    lighting.Brightness = 2.5
+    lighting.GlobalShadows = true
     
-    -- 「フルブライト」ではなく、夜の雰囲気を壊さない程度の環境光
-    lighting.Ambient = Color3.fromRGB(35, 35, 40)
-    lighting.OutdoorAmbient = Color3.fromRGB(20, 20, 25)
-    
-    -- モニター越しでも地形が見えるように露出を調整
+    -- 真っ黒にせず、わずかに深みのある色を入れることで視認性を確保
+    local ambientColor = Color3.fromRGB(40, 40, 50)
+    lighting.Ambient = ambientColor
+    lighting.OutdoorAmbient = ambientColor
     lighting.ExposureCompensation = 1.0
 end
 
--- 3. パーツの質感（漆黒 ＆ 磨かれた透明）
+-- 3. パーツの制御（透明なものは除外）
 local function ForceEnvironment()
     CleanEnvironment()
     ApplyLighting()
 
     for _, obj in pairs(game.Workspace:GetDescendants()) do
+        -- プレイヤー自身やカメラ、地形、水(Terrain)は除外
         if not obj:IsDescendantOf(localPlayer.Character or game.Workspace.CurrentCamera) and not obj:IsA("Terrain") then
             pcall(function()
                 if obj:IsA("BasePart") then
                     if isTransparent then
-                        -- 【Pキー：綺麗な透明モード】
-                        -- 向こう側を透視するのではなく、高級感のあるクリスタル質感
-                        obj.Color = Color3.fromRGB(50, 50, 70)
-                        obj.Material = Enum.Material.Glass 
-                        obj.Transparency = 0.4
-                        obj.Reflectance = 0.7 -- 星空を美しく反射させる
+                        -- 【Pキー：クリスタルモード】
+                        -- 透明度を活かしつつ、鏡のような反射を追加
+                        obj.Color = Color3.fromRGB(100, 100, 120)
+                        obj.Material = Enum.Material.Glass
+                        obj.Transparency = 0.5
+                        obj.Reflectance = 0.8
                     else
-                        -- 【通常：磨き抜かれた漆黒】
-                        if obj.Transparency < 0.5 then
+                        -- 【通常モード：賢い漆黒】
+                        -- 元々透明なパーツ(Transparencyが0.1以上)は無視する
+                        if obj.Transparency < 0.1 then
                             obj.Color = Color3.new(0, 0, 0)
-                            obj.Material = Enum.Material.SmoothPlastic
+                            obj.Material = Enum.Material.Metal -- 反射を活かして形を見せる
                             obj.Transparency = 0
-                            obj.Reflectance = 0.08 -- わずかな反射でエッジを見せる
+                            obj.Reflectance = 0.12 -- 星空をわずかに反射させて輪郭を出す
                         end
                     end
                 elseif obj:IsA("Texture") or obj:IsA("Decal") then
+                    -- 完全に見た目を邪魔するデカールのみ消去
                     obj.Transparency = 1
                 end
             end)
@@ -82,7 +72,7 @@ local function ForceEnvironment()
     end
 end
 
--- 4. 空の絶対死守
+-- 4. 空の維持
 local function ForceSky()
     local sky = lighting:FindFirstChild("CustomSky")
     if not sky then
@@ -101,14 +91,14 @@ local function ForceSky()
     end
 end
 
--- 5. 実行
+-- 5. ループ実行
 RunService.Heartbeat:Connect(function()
     pcall(ForceSky)
     pcall(CleanEnvironment)
 end)
 
 task.spawn(function()
-    print("--- Midnight Crystal System Online: Clouds Removed ---")
+    print("--- Midnight Script Online (Transparency Guard Active) ---")
     while true do
         pcall(ForceEnvironment)
         task.wait(5)
