@@ -1,4 +1,4 @@
--- [[ 漆念：真プロトコル (透明排除・人影シルエット版) ]]
+-- [[ 漆念：真・神威 (透明完全排除 / 空・絶対固定版) ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -10,87 +10,88 @@ local NEW_BK = "rbxassetid://88926366882961"
 local NEW_RT = "rbxassetid://111173485460565"
 local isTransparent = false
 
--- 1. 空の「超」強制固定 (ゲーム側のCloudsに負けない)
+-- 1. 空の「絶対支配」：ゲーム側のリセットを物理的に許さない
 RunService.RenderStepped:Connect(function()
     local sky = lighting:FindFirstChild("CustomSky") or Instance.new("Sky", lighting)
     sky.Name = "CustomSky"
+    -- 毎フレーム強制書き換え
     sky.SkyboxBk = NEW_BK
     sky.SkyboxRt = NEW_RT
     sky.SkyboxFt = "rbxassetid://72529916859362"
     sky.SkyboxLf = "rbxassetid://116760075528148"
     sky.SkyboxUp = "rbxassetid://119892967613407"
     sky.SkyboxDn = "rbxassetid://123559461938777"
-    sky.CelestialBodiesShown = false
+    sky.SunAngularSize, sky.MoonAngularSize = 0, 0
 
-    -- ライティングの白さを物理的に殺す
+    -- ライティングのキショい白を根絶
     lighting.Brightness = 0
     lighting.OutdoorAmbient = Color3.new(0, 0, 0)
     lighting.EnvironmentDiffuseScale = 0
     lighting.EnvironmentSpecularScale = 0
-    lighting.FogEnd = 1e6
+    lighting.FogEnd = 1e8 -- 霧を宇宙の果てまで飛ばす
 end)
 
--- 2. パーツ判定 (透明なら消し、不透明なら黒く、人型は影に)
+-- 2. パーツ判定：透明なら消す、不透明なら漆黒
 local function ApplyStyle(obj)
     if not obj:IsA("BasePart") or obj:IsA("Terrain") then return end
     if obj:IsDescendantOf(localPlayer.Character) then return end
 
     pcall(function()
-        -- 最初の状態をタグで記録
-        if not obj:FindFirstChild("OrigT") then
-            local val = Instance.new("NumberValue", obj)
-            val.Name = "OrigT"
-            val.Value = obj.Transparency
+        -- 初回の透明度を記録
+        if not obj:FindFirstChild("T_Save") then
+            local v = Instance.new("NumberValue", obj)
+            v.Name = "T_Save"
+            v.Value = obj.Transparency
         end
 
-        local originT = obj.OrigT.Value
+        local originalT = obj.T_Save.Value
 
         if isTransparent then
-            -- 【透明（クリスタル）モード】
+            -- 【クリスタルモード】透視不可の鏡面
             obj.Transparency = 0.4
-            obj.Reflectance = 1.0 -- 透視防止
+            obj.Reflectance = 1.0
             obj.Material = Enum.Material.Glass
-            obj.Color = Color3.fromRGB(120, 120, 180)
+            obj.Color = Color3.fromRGB(130, 130, 200)
         else
-            -- 【黒（漆黒）モード】
-            if originT > 0 then
-                -- ★透明度が少しでもあるものは「消去」
+            -- 【漆黒モード】
+            if originalT > 0 then
+                -- ★透明度があるものは「表示しない」
                 obj.Transparency = 1
             else
-                -- 不透明な建造物やデコイ
-                obj.Color = Color3.new(0, 0, 0)
+                -- 不透明な建造物・デコイは「形を保った漆黒」
                 obj.Transparency = 0
+                obj.Color = Color3.new(0, 0, 0)
                 obj.Material = Enum.Material.SmoothPlastic
                 obj.Reflectance = 0
-                -- 四角い塊に見える原因の「境界線」を消すためにCastShadowをオフにする
-                obj.CastShadow = false
+                obj.CastShadow = false -- 四角い箱に見える原因の影を消す
             end
         end
     end)
 end
 
--- 3. システム制御
-local function RefreshAll()
-    for _, obj in ipairs(game.Workspace:GetDescendants()) do
-        ApplyStyle(obj)
+-- 3. 全体リフレッシュ
+local function FullUpdate()
+    for _, item in ipairs(game.Workspace:GetDescendants()) do
+        ApplyStyle(item)
     end
 end
 
+-- Pキーでモード切替
 UserInputService.InputBegan:Connect(function(input, gp)
     if not gp and input.KeyCode == Enum.KeyCode.P then
         isTransparent = not isTransparent
-        RefreshAll()
+        FullUpdate()
     end
 end)
 
--- 常に監視
+-- 監視維持
 game.Workspace.DescendantAdded:Connect(ApplyStyle)
 task.spawn(function()
     while true do
-        RefreshAll()
-        task.wait(1.5)
+        FullUpdate()
+        task.wait(1)
     end
 end)
 
-RefreshAll()
-print("--- Final Protocol: Pure Black & Clear Sky Loaded ---")
+FullUpdate()
+print("--- Final Authority: Darkness & Custom Sky Loaded ---")
