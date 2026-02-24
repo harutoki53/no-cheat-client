@@ -1,4 +1,4 @@
--- [[ 漆念：空更新エラー修正 ＆ クリア夜景確定版 ]]
+-- [[ 漆念：真・完成版 (ラグ修正/キャラ形状維持/反射クリスタル) ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -6,33 +6,29 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local localPlayer = game:GetService("Players").LocalPlayer
 
--- 空ID
 local NEW_BK = "rbxassetid://88926366882961"
 local NEW_RT = "rbxassetid://111173485460565"
 local isTransparent = false
 
--- 1. 空の強制更新 (ログのエラーを止める)
-local function ForceSky()
-    -- エラーの元「Clouds」を消さずに、無力化する
+-- 1. 環境と空のセットアップ (エラー回避Ver)
+local function SetupEnvironment()
+    -- 警告を止めるため、一度だけ実行
     for _, obj in ipairs(game.Workspace:GetDescendants()) do
-        if obj:IsA("Clouds") then
-            obj.Enabled = false
-            obj.Cover = 0
-            obj.Density = 0
-        end
+        if obj:IsA("Clouds") then obj.Enabled = false end
     end
+    
+    lighting.ClockTime = 2
+    lighting.Brightness = 2
+    lighting.GlobalShadows = false
+    lighting.FogEnd = 1e6
+    
+    local ambient = Color3.fromRGB(60, 60, 80)
+    lighting.Ambient = ambient
+    lighting.OutdoorAmbient = ambient
 
-    -- 既存のSkyboxを全て消去して、自分の設定を最優先にする
-    for _, obj in ipairs(lighting:GetChildren()) do
-        if obj:IsA("Sky") and obj.Name ~= "CustomSky" then
-            obj:Destroy()
-        end
-    end
-
+    -- 空の強制適用
     local sky = lighting:FindFirstChild("CustomSky") or Instance.new("Sky", lighting)
     sky.Name = "CustomSky"
-    
-    -- IDが一致しない場合は強制的に上書きし続ける
     if sky.SkyboxBk ~= NEW_BK then
         sky.SkyboxFt = "rbxassetid://72529916859362"
         sky.SkyboxBk = NEW_BK
@@ -41,41 +37,31 @@ local function ForceSky()
         sky.SkyboxUp = "rbxassetid://119892967613407"
         sky.SkyboxDn = "rbxassetid://123559461938777"
         sky.SunAngularSize = 0
-        sky.MoonAngularSize = 0
     end
-
-    -- Atmosphere（大気）が空を隠すので見つけ次第消す
+    
     local atm = lighting:FindFirstChildOfClass("Atmosphere")
     if atm then atm:Destroy() end
 end
 
--- 2. ライティング（クッキリ見える深夜）
-local function SetupLighting()
-    lighting.ClockTime = 2
-    lighting.Brightness = 2
-    lighting.GlobalShadows = false
-    lighting.FogEnd = 1e6
-    
-    local ambient = Color3.fromRGB(65, 65, 80)
-    lighting.Ambient = ambient
-    lighting.OutdoorAmbient = ambient
-    lighting.ExposureCompensation = 1.0
-end
-
--- 3. パーツ処理（Pキーでクリスタル ↔ 漆黒）
+-- 2. パーツ処理 (キャラの形を守りつつ質感を変える)
 local function ProcessPart(obj)
     if not obj:IsA("BasePart") or obj:IsA("Terrain") then return end
-    if obj:IsDescendantOf(localPlayer.Character or game.Workspace.CurrentCamera) then return end
+    
+    -- 【重要】キャラクターやデコイの形（頭など）を守るための除外設定
+    if obj:IsDescendantOf(localPlayer.Character) or obj.Parent:FindFirstChildOfClass("Humanoid") then 
+        return 
+    end
 
     pcall(function()
         if isTransparent then
-            -- シャープなクリスタル質感 (Ice)
-            obj.Color = Color3.fromRGB(180, 180, 255)
-            obj.Material = Enum.Material.Ice
-            obj.Transparency = 0.6
-            obj.Reflectance = 0.3
+            -- 【クリアモード：反射クリスタル】
+            -- 透明度を上げすぎず、反射を最大にすることで「透視」を防ぎ「綺麗さ」を出す
+            obj.Color = Color3.fromRGB(150, 150, 200)
+            obj.Material = Enum.Material.Glass
+            obj.Transparency = 0.5 -- これ以上上げると透視できてしまうので固定
+            obj.Reflectance = 1.0 -- 空を鏡のように反射させる
         else
-            -- 磨き抜かれた漆黒 (SmoothPlastic)
+            -- 【ブラックモード：漆黒】
             if obj.Transparency < 0.1 then
                 obj.Color = Color3.new(0, 0, 0)
                 obj.Material = Enum.Material.SmoothPlastic
@@ -86,28 +72,35 @@ local function ProcessPart(obj)
     end)
 end
 
-local function RefreshAll()
+-- 全パーツの更新
+local function Refresh()
     for _, obj in ipairs(game.Workspace:GetDescendants()) do
         ProcessPart(obj)
     end
 end
 
--- 4. 実行ループ
-game.Workspace.DescendantAdded:Connect(ProcessPart)
-
+-- 3. イベント登録
 UserInputService.InputBegan:Connect(function(input, gp)
     if not gp and input.KeyCode == Enum.KeyCode.P then
         isTransparent = not isTransparent
-        RefreshAll()
+        print("Mode: " .. (isTransparent and "Crystal" or "Blackout"))
+        Refresh() -- モード切り替え時に一括更新
     end
 end)
 
--- Heartbeatで空を監視（エラーが出ない方法に変更）
-RunService.Heartbeat:Connect(function()
-    pcall(ForceSky)
+-- 新しく追加されたパーツも自動処理
+game.Workspace.DescendantAdded:Connect(ProcessPart)
+
+-- 空とライティングを一定間隔でチェック (ラグ防止のためHeartbeatから分離)
+task.spawn(function()
+    while true do
+        pcall(SetupEnvironment)
+        task.wait(2)
+    end
 end)
 
-SetupLighting()
-RefreshAll()
+-- 初回実行
+SetupEnvironment()
+Refresh()
 
-print("--- Midnight Fix: Errors Suppressed & Sky Forced ---")
+print("--- Midnight Final: Anti-Lag & Shape Protection Loaded ---")
