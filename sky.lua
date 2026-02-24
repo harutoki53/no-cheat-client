@@ -1,4 +1,4 @@
--- [[ 漆念：絶対支配・零式 (光消滅プロトコル) ]]
+-- [[ 漆念：真プロトコル (透明排除・人影維持版) ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -10,72 +10,89 @@ local NEW_BK = "rbxassetid://88926366882961"
 local NEW_RT = "rbxassetid://111173485460565"
 local isTransparent = false
 
--- 1. 世界から「光」を奪う（白さを消す）
+-- 1. 空と光の完全支配（毎フレーム実行）
 RunService.RenderStepped:Connect(function()
-    -- 空の強制固定
     local sky = lighting:FindFirstChild("CustomSky") or Instance.new("Sky", lighting)
     sky.Name = "CustomSky"
-    sky.SkyboxBk = NEW_BK
-    sky.SkyboxRt = NEW_RT
-    sky.SkyboxFt = "rbxassetid://72529916859362"
-    sky.SkyboxLf = "rbxassetid://116760075528148"
-    sky.SkyboxUp = "rbxassetid://119892967613407"
-    sky.SkyboxDn = "rbxassetid://123559461938777"
-    
-    -- ライティングを全破壊して真っ黒にする
+    if sky.SkyboxBk ~= NEW_BK then
+        sky.SkyboxBk = NEW_BK
+        sky.SkyboxRt = NEW_RT
+        sky.SkyboxFt = "rbxassetid://72529916859362"
+        sky.SkyboxLf = "rbxassetid://116760075528148"
+        sky.SkyboxUp = "rbxassetid://119892967613407"
+        sky.SkyboxDn = "rbxassetid://123559461938777"
+    end
+
+    -- 世界の白さを消し、漆黒を際立たせる
     lighting.Brightness = 0
     lighting.OutdoorAmbient = Color3.new(0, 0, 0)
-    lighting.Ambient = Color3.new(0, 0, 0)
     lighting.EnvironmentDiffuseScale = 0
     lighting.EnvironmentSpecularScale = 0
-    lighting.GlobalShadows = false
-    lighting.ClockTime = 2
+    lighting.FogEnd = 1e6
 end)
 
--- 2. 全てのモノを「絶対」に塗り替える
-local function AbsoluteApply(obj)
+-- 2. オブジェクト判定
+local function ApplyStyle(obj)
     if not obj:IsA("BasePart") or obj:IsA("Terrain") then return end
-    -- 自分だけは見えるように除外
     if obj:IsDescendantOf(localPlayer.Character) then return end
 
     pcall(function()
+        -- 元の透明度をタグで記録（初回のみ）
+        if not obj:FindFirstChild("OriginT") then
+            local val = Instance.new("NumberValue", obj)
+            val.Name = "OriginT"
+            val.Value = obj.Transparency
+        end
+
+        local originT = obj.OriginT.Value
+
         if isTransparent then
-            -- 【透明：超反射クリスタル】
-            -- Reflectanceを爆上げして「鏡」にすることで透視を100%防ぐ
-            obj.Transparency = 0.5
-            obj.Reflectance = 10 -- 鏡面反射を極限まで強化
+            -- 【透明（クリスタル）モード】
+            obj.Transparency = 0.4
+            obj.Reflectance = 1.0
             obj.Material = Enum.Material.Glass
-            obj.Color = Color3.fromRGB(100, 100, 150)
+            obj.Color = Color3.fromRGB(150, 150, 255)
         else
-            -- 【黒：絶対漆黒】
-            -- 全ての建造物、デコイ、窓を例外なく不透明な黒へ
-            obj.Transparency = 0
-            obj.Reflectance = 0
-            obj.Material = Enum.Material.SmoothPlastic
-            obj.Color = Color3.new(0, 0, 0)
+            -- 【漆黒モード】
+            if originT > 0 then
+                -- ★透明度が少しでもあるものは「表示しない」
+                obj.Transparency = 1
+                obj.CanCollide = obj.CanCollide -- 判定は残す
+            else
+                -- 不透明な建造物やデコイは「形を保ったまま漆黒」
+                obj.Transparency = 0
+                obj.Color = Color3.new(0, 0, 0)
+                obj.Material = Enum.Material.SmoothPlastic
+                obj.Reflectance = 0
+            end
         end
     end)
 end
 
--- 3. 秒間ループで「戻る」のを阻止
-task.spawn(function()
-    while true do
-        for _, obj in ipairs(game.Workspace:GetDescendants()) do
-            AbsoluteApply(obj)
-        end
-        task.wait(0.5) -- 0.5秒ごとに全スキャンして塗り直す
+-- 3. 高速リフレッシュ（Pキー対応）
+local function FullRefresh()
+    for _, obj in ipairs(game.Workspace:GetDescendants()) do
+        ApplyStyle(obj)
     end
-end)
+end
 
--- Pキーで切り替え
 UserInputService.InputBegan:Connect(function(input, gp)
     if not gp and input.KeyCode == Enum.KeyCode.P then
         isTransparent = not isTransparent
-        for _, obj in ipairs(game.Workspace:GetDescendants()) do
-            AbsoluteApply(obj)
-        end
+        FullRefresh()
     end
 end)
 
-game.Workspace.DescendantAdded:Connect(AbsoluteApply)
-print("--- Zero Protocol: Eternal Darkness Loaded ---")
+-- 新規出現物への即時適用
+game.Workspace.DescendantAdded:Connect(ApplyStyle)
+
+-- 1秒おきの強制再判定（戻り防止）
+task.spawn(function()
+    while true do
+        FullRefresh()
+        task.wait(1)
+    end
+end)
+
+FullRefresh()
+print("--- Protocol Updated: Transparency Removed & Shapes Kept ---")
