@@ -1,4 +1,4 @@
--- [[ 漆念：最終完全版 (空の強制再生成・視認性強化) ]]
+-- [[ 漆念：最終完全版 (夜の雰囲気維持・夜間視力Ver) ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -12,24 +12,19 @@ local NEW_RT = "rbxassetid://111173485460565"
 
 local isTransparent = false
 
--- 1. 空の「強制再生成」ループ（既存の空を破壊して上書き）
+-- 1. 空の制御（雲バグ対策＋深夜固定）
 local function ForceSky()
-    -- 霧や大気エフェクトが邪魔をして空が見えない場合が多いので、これらを徹底排除
-    for _, obj in pairs(lighting:GetChildren()) do
-        if obj:IsA("Atmosphere") or obj:IsA("Clouds") or obj:IsA("FogEnd") then
-            obj:Destroy()
+    for _, obj in pairs(game.Workspace:GetDescendants()) do
+        if obj:IsA("Clouds") then
+            obj.Enabled = false -- 2枚目の写真の白い塊を消す
         end
     end
-
-    -- Skyオブジェクトの管理
+    
     local sky = lighting:FindFirstChildOfClass("Sky")
     if not sky then
         sky = Instance.new("Sky")
-        sky.Name = "CustomSky"
         sky.Parent = lighting
     end
-
-    -- IDが一致しない場合は強制上書き
     if sky.SkyboxBk ~= NEW_BK then
         sky.SkyboxFt = "rbxassetid://72529916859362"
         sky.SkyboxBk = NEW_BK
@@ -37,40 +32,46 @@ local function ForceSky()
         sky.SkyboxLf = "rbxassetid://116760075528148"
         sky.SkyboxUp = "rbxassetid://119892967613407"
         sky.SkyboxDn = "rbxassetid://123559461938777"
-        sky.SunAngularSize = 0
-        sky.MoonAngularSize = 20 -- 月の光を少しだけ残して視認性を助ける
     end
     
-    -- 時間と霧の設定
+    -- 時間を深夜に固定（夜の雰囲気を守る）
     lighting.ClockTime = 2
-    lighting.FogEnd = 100000
-    lighting.GlobalShadows = true -- 影を有効にして立体感を出す
 end
 
--- 2. 環境 ＆ 全オブジェクトの黒化（輪郭強調Ver）
+-- 2. 環境制御（夜間視力：明るすぎない設定）
+local function ApplyNightVision()
+    lighting.Brightness = 1 -- 眩しくない程度
+    lighting.GlobalShadows = false -- これにより「真っ黒で見えない」場所をなくす
+    
+    -- 白ではなく、深いグレーに設定（これが「夜の雰囲気」の秘訣です）
+    local nightTone = Color3.fromRGB(60, 60, 65) 
+    lighting.Ambient = nightTone
+    lighting.OutdoorAmbient = nightTone
+    
+    -- 露出を少しだけ上げて、モニターで見やすく調整
+    lighting.ExposureCompensation = 0.5
+end
+
+-- 3. 地形黒化（Pキーで切り替え）
 local function ForceEnvironment()
-    -- 【視認性改善】真っ暗すぎて見えないのを防ぐ設定
-    lighting.Brightness = 1.5 -- 輝度を少し上げて反射を際立たせる
-    lighting.Ambient = Color3.fromRGB(30, 30, 30) -- 環境光を少し上げ、黒の中にも「形」が見えるように
-    lighting.OutdoorAmbient = Color3.fromRGB(15, 15, 15)
-    lighting.ExposureCompensation = 0 -- 露出を標準に戻す
+    ApplyNightVision()
 
     for _, obj in pairs(game.Workspace:GetDescendants()) do
         if not obj:IsDescendantOf(localPlayer.Character or game.Workspace.CurrentCamera) and not obj:IsA("Terrain") then
             pcall(function()
                 if isTransparent then
-                    -- 【Pキー：透明モード】
-                    obj.Color = Color3.fromRGB(80, 80, 100)
+                    -- 【Pキー：透き通るクリスタル】
+                    obj.Color = Color3.fromRGB(60, 60, 80)
                     obj.Material = Enum.Material.ForceField
                     obj.Transparency = 0.4
+                    obj.Reflectance = 0
                 else
-                    -- 【通常：エッジ強調の黒】
+                    -- 【通常：夜に溶け込む黒】
                     if obj:IsA("BasePart") and obj.Transparency < 0.5 then
                         obj.Color = Color3.new(0, 0, 0)
-                        obj.Material = Enum.Material.Metal -- Plasticより反射が綺麗に出るMetalに変更
+                        obj.Material = Enum.Material.SmoothPlastic
                         obj.Transparency = 0
-                        -- 反射率を0.15までアップ。これで「黒いけど形がクッキリ見える」ようになります。
-                        obj.Reflectance = 0.15 
+                        obj.Reflectance = 0.05 -- わずかな光沢で高級感を出す
                     elseif obj:IsA("Texture") or obj:IsA("Decal") then
                         obj.Transparency = 1
                     end
@@ -80,7 +81,7 @@ local function ForceEnvironment()
     end
 end
 
--- 3. キー入力 (Pキー)
+-- 4. キー入力 (Pキー)
 UserInputService.InputBegan:Connect(function(input, gp)
     if not gp and input.KeyCode == Enum.KeyCode.P then
         isTransparent = not isTransparent
@@ -88,12 +89,14 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- 4. 実行ループ
+-- 5. 実行ループ
 RunService.Heartbeat:Connect(function()
     pcall(ForceSky)
+    pcall(ApplyNightVision)
 end)
 
 task.spawn(function()
+    print("--- Midnight Vision Online: Clear but Dark ---")
     while true do
         pcall(ForceEnvironment)
         task.wait(5)
