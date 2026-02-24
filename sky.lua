@@ -1,4 +1,4 @@
--- [[ 漆念：視認性改善・透明排除プロトコル ]]
+-- [[ 漆念：真・完結プロトコル ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -8,39 +8,41 @@ local localPlayer = game:GetService("Players").LocalPlayer
 
 local isTransparent = false
 
--- 1. 空の固定 ＆ 視認性のためのライティング調整
-RunService.RenderStepped:Connect(function()
-    local sky = lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", lighting)
-    
-    -- 今の綺麗な星空ID
+-- 1. 空の「全削除 ＆ 再構築」プロトコル
+local function SetupSky()
+    for _, obj in ipairs(lighting:GetChildren()) do
+        if obj:IsA("Sky") then obj:Destroy() end
+    end
+
+    local sky = Instance.new("Sky", lighting)
     sky.SkyboxFt = "rbxassetid://72529916859362"
-    sky.SkyboxBk = "rbxassetid://88926366882961"
-    sky.SkyboxRt = "rbxassetid://111173485460565"
+    sky.SkyboxBk = "rbxassetid://74808508289471"
+    sky.SkyboxRt = "rbxassetid://103546862048950"
     sky.SkyboxLf = "rbxassetid://116760075528148"
     sky.SkyboxUp = "rbxassetid://119892967613407"
     sky.SkyboxDn = "rbxassetid://123559461938777"
     sky.SunTextureId = ""
+end
 
-    -- 【改善】「黒すぎる」を解消するためのライティング
-    lighting.ClockTime = 2
-    lighting.Brightness = 2 -- 0から2へ引き上げ
-    lighting.GlobalShadows = true -- 影を出すことで物の「立体感」を出す
+-- ライティングを「見える暗さ」に固定
+RunService.RenderStepped:Connect(function()
+    if not lighting:FindFirstChildOfClass("Sky") then SetupSky() end
     
-    -- 紺色に近い環境光を入れ、闇の中でも形が見えるようにする
-    local moonAmbient = Color3.fromRGB(45, 45, 60)
-    lighting.Ambient = moonAmbient
-    lighting.OutdoorAmbient = moonAmbient
-    
-    lighting.EnvironmentDiffuseScale = 0.2 -- わずかに光を拡散させる
+    lighting.ClockTime = 0 
+    lighting.Brightness = 0.5
+    lighting.OutdoorAmbient = Color3.fromRGB(25, 25, 30) -- 視認性を守る紺色
+    lighting.Ambient = Color3.fromRGB(0, 0, 0)
+    lighting.EnvironmentDiffuseScale = 0.3
     lighting.FogEnd = 1e6
 end)
 
--- 2. パーツ判定（透明排除 ＆ シルエット維持）
+-- 2. パーツ判定：透明なら消す、不透明なら漆黒シルエット
 local function ApplyStyle(obj)
     if not obj:IsA("BasePart") or obj:IsA("Terrain") then return end
     if obj:IsDescendantOf(localPlayer.Character) then return end
 
     pcall(function()
+        -- 初回の透明度を記録
         if not obj:FindFirstChild("OrigT") then
             local v = Instance.new("NumberValue", obj)
             v.Name = "OrigT"
@@ -48,25 +50,25 @@ local function ApplyStyle(obj)
         end
 
         if isTransparent then
-            -- 【Pキー：クリスタルモード】
+            -- 【Pキー：クリスタル】
             obj.Transparency = 0.4
             obj.Reflectance = 0.8
             obj.Material = Enum.Material.Glass
-            obj.Color = Color3.fromRGB(150, 150, 200)
+            obj.Color = Color3.fromRGB(150, 150, 255)
         else
-            -- 【漆黒モード】
+            -- 【通常：漆黒モード】
             if obj.OrigT.Value > 0 then
-                -- 透明度が少しでもあるものは「表示しない」
+                -- ★透明度が少しでもあるものは「表示しない」
                 obj.Transparency = 1
             else
                 -- 不透明な建造物やデコイ
                 obj.Transparency = 0
-                obj.Color = Color3.new(0, 0, 0)
-                -- PlasticではなくMetalにすることで、星明かりをエッジで反射させて形を見せる
-                obj.Material = Enum.Material.Metal 
-                obj.Reflectance = 0.1 -- わずかな反射が視認性を生む
+                obj.Color = Color3.fromRGB(15, 15, 15) -- 以前成功した質感
+                obj.Material = Enum.Material.SmoothPlastic
+                obj.Reflectance = 0
+                obj.CastShadow = false
                 
-                -- デカール（顔や服のテクスチャ）を消して四角い箱化を防ぐ
+                -- 四角い箱に見える原因のテクスチャを消す
                 for _, child in ipairs(obj:GetChildren()) do
                     if child:IsA("Decal") or child:IsA("Texture") then
                         child.Transparency = 1
@@ -95,9 +97,10 @@ game.Workspace.DescendantAdded:Connect(ApplyStyle)
 task.spawn(function()
     while true do
         Refresh()
-        task.wait(1.5)
+        task.wait(2)
     end
 end)
 
+SetupSky()
 Refresh()
-print("--- Midnight Polish: Visible Shadows & Clean Sky ---")
+print("--- Final Authority: System Restored & Optimized ---")
