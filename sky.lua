@@ -1,4 +1,4 @@
--- [[ 漆念：真・神威 (透明完全排除 / 空・絶対固定版) ]]
+-- [[ 漆念：視認性改善・透明排除プロトコル ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
@@ -6,92 +6,98 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local localPlayer = game:GetService("Players").LocalPlayer
 
-local NEW_BK = "rbxassetid://88926366882961"
-local NEW_RT = "rbxassetid://111173485460565"
 local isTransparent = false
 
--- 1. 空の「絶対支配」：ゲーム側のリセットを物理的に許さない
+-- 1. 空の固定 ＆ 視認性のためのライティング調整
 RunService.RenderStepped:Connect(function()
-    local sky = lighting:FindFirstChild("CustomSky") or Instance.new("Sky", lighting)
-    sky.Name = "CustomSky"
-    -- 毎フレーム強制書き換え
-    sky.SkyboxBk = NEW_BK
-    sky.SkyboxRt = NEW_RT
+    local sky = lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", lighting)
+    
+    -- 今の綺麗な星空ID
     sky.SkyboxFt = "rbxassetid://72529916859362"
+    sky.SkyboxBk = "rbxassetid://88926366882961"
+    sky.SkyboxRt = "rbxassetid://111173485460565"
     sky.SkyboxLf = "rbxassetid://116760075528148"
     sky.SkyboxUp = "rbxassetid://119892967613407"
     sky.SkyboxDn = "rbxassetid://123559461938777"
-    sky.SunAngularSize, sky.MoonAngularSize = 0, 0
+    sky.SunTextureId = ""
 
-    -- ライティングのキショい白を根絶
-    lighting.Brightness = 0
-    lighting.OutdoorAmbient = Color3.new(0, 0, 0)
-    lighting.EnvironmentDiffuseScale = 0
-    lighting.EnvironmentSpecularScale = 0
-    lighting.FogEnd = 1e8 -- 霧を宇宙の果てまで飛ばす
+    -- 【改善】「黒すぎる」を解消するためのライティング
+    lighting.ClockTime = 2
+    lighting.Brightness = 2 -- 0から2へ引き上げ
+    lighting.GlobalShadows = true -- 影を出すことで物の「立体感」を出す
+    
+    -- 紺色に近い環境光を入れ、闇の中でも形が見えるようにする
+    local moonAmbient = Color3.fromRGB(45, 45, 60)
+    lighting.Ambient = moonAmbient
+    lighting.OutdoorAmbient = moonAmbient
+    
+    lighting.EnvironmentDiffuseScale = 0.2 -- わずかに光を拡散させる
+    lighting.FogEnd = 1e6
 end)
 
--- 2. パーツ判定：透明なら消す、不透明なら漆黒
+-- 2. パーツ判定（透明排除 ＆ シルエット維持）
 local function ApplyStyle(obj)
     if not obj:IsA("BasePart") or obj:IsA("Terrain") then return end
     if obj:IsDescendantOf(localPlayer.Character) then return end
 
     pcall(function()
-        -- 初回の透明度を記録
-        if not obj:FindFirstChild("T_Save") then
+        if not obj:FindFirstChild("OrigT") then
             local v = Instance.new("NumberValue", obj)
-            v.Name = "T_Save"
+            v.Name = "OrigT"
             v.Value = obj.Transparency
         end
 
-        local originalT = obj.T_Save.Value
-
         if isTransparent then
-            -- 【クリスタルモード】透視不可の鏡面
+            -- 【Pキー：クリスタルモード】
             obj.Transparency = 0.4
-            obj.Reflectance = 1.0
+            obj.Reflectance = 0.8
             obj.Material = Enum.Material.Glass
-            obj.Color = Color3.fromRGB(130, 130, 200)
+            obj.Color = Color3.fromRGB(150, 150, 200)
         else
             -- 【漆黒モード】
-            if originalT > 0 then
-                -- ★透明度があるものは「表示しない」
+            if obj.OrigT.Value > 0 then
+                -- 透明度が少しでもあるものは「表示しない」
                 obj.Transparency = 1
             else
-                -- 不透明な建造物・デコイは「形を保った漆黒」
+                -- 不透明な建造物やデコイ
                 obj.Transparency = 0
                 obj.Color = Color3.new(0, 0, 0)
-                obj.Material = Enum.Material.SmoothPlastic
-                obj.Reflectance = 0
-                obj.CastShadow = false -- 四角い箱に見える原因の影を消す
+                -- PlasticではなくMetalにすることで、星明かりをエッジで反射させて形を見せる
+                obj.Material = Enum.Material.Metal 
+                obj.Reflectance = 0.1 -- わずかな反射が視認性を生む
+                
+                -- デカール（顔や服のテクスチャ）を消して四角い箱化を防ぐ
+                for _, child in ipairs(obj:GetChildren()) do
+                    if child:IsA("Decal") or child:IsA("Texture") then
+                        child.Transparency = 1
+                    end
+                end
             end
         end
     end)
 end
 
--- 3. 全体リフレッシュ
-local function FullUpdate()
+-- 3. 全体制御
+local function Refresh()
     for _, item in ipairs(game.Workspace:GetDescendants()) do
         ApplyStyle(item)
     end
 end
 
--- Pキーでモード切替
 UserInputService.InputBegan:Connect(function(input, gp)
     if not gp and input.KeyCode == Enum.KeyCode.P then
         isTransparent = not isTransparent
-        FullUpdate()
+        Refresh()
     end
 end)
 
--- 監視維持
 game.Workspace.DescendantAdded:Connect(ApplyStyle)
 task.spawn(function()
     while true do
-        FullUpdate()
-        task.wait(1)
+        Refresh()
+        task.wait(1.5)
     end
 end)
 
-FullUpdate()
-print("--- Final Authority: Darkness & Custom Sky Loaded ---")
+Refresh()
+print("--- Midnight Polish: Visible Shadows & Clean Sky ---")
