@@ -1,33 +1,48 @@
--- [[ 漆念：デザイン性維持・全マップ強制黒化コンプリート ]]
+-- [[ 漆念：最終確定版 - エラー修正・全マップ対応・デザイン黒化 ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
-local workspace = game:GetService("Workspace")
+local runService = game:GetService("RunService")
+-- game.Players を直接取得することでエラーを回避
+local players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
 
-print("SKY SCRIPT: DESIGNER BLACKOUT ONLINE!")
+print("SKY SCRIPT: FINAL CORRECTED VERSION STARTING!")
 
--- オブジェクトに「質の高い黒」を適用する関数
+-- デザイン性の高い黒を適用する関数
 local function ApplyDesignBlack(v)
-    if v:IsA("BasePart") and not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
-        pcall(function()
-            -- 透明なものは除外（デザインを壊さないため）
-            if v.Transparency < 0.5 then
-                -- 単なる(0,0,0)ではなく、深みのある黒
-                v.Color = Color3.fromRGB(12, 12, 15) 
-                -- 質感を SmoothPlastic に統一して高級感を出す
-                v.Material = Enum.Material.SmoothPlastic
-                -- 空のキャラの光をうっすら反射させる（ここがデザインの肝）
-                v.Reflectance = 0.05 
+    -- キャラクターの判定をより確実に修正
+    if v:IsA("BasePart") then
+        local isChar = false
+        if localPlayer and localPlayer.Character then
+            if v:IsDescendantOf(localPlayer.Character) then
+                isChar = true
             end
-        end)
+        end
+
+        if not isChar then
+            pcall(function()
+                if v.Transparency < 0.5 then
+                    v.Color = Color3.fromRGB(12, 12, 15) 
+                    v.Material = Enum.Material.SmoothPlastic
+                    v.Reflectance = 0.05 -- 反射で単調さを回避
+                end
+            end)
+        end
     elseif v:IsA("Texture") or v:IsA("Decal") then
-        -- 余計なポスターなどは消してデザインをシンプルに
         v.Transparency = 1
     end
 end
 
-local function ApplyFinalAdjustment()
-    -- 1. 空の死守（キャラを鮮明に映す）
+local function ApplyFinalVisuals()
+    -- 1. ライティング設定（空を鮮明にし、地上を締める）
+    lighting.ClockTime = 14.5
+    lighting.Brightness = 2.0
+    lighting.OutdoorAmbient = Color3.fromRGB(30, 30, 35)
+    lighting.Ambient = Color3.fromRGB(10, 10, 10)
+    lighting.ExposureCompensation = 0.6
+
+    -- 2. 空の死守
     local sky = lighting:FindFirstChild("LatestSky_Final")
     if not sky then
         for _, obj in pairs(lighting:GetChildren()) do
@@ -46,26 +61,21 @@ local function ApplyFinalAdjustment()
     sky.SkyboxDn = "rbxassetid://123559461938777"
     sky.SunAngularSize = 0
 
-    -- 2. ライティング調整（コントラストを強調）
-    lighting.ClockTime = 14.5
-    lighting.Brightness = 2.0
-    lighting.OutdoorAmbient = Color3.fromRGB(30, 30, 35) -- 影を少し深く
-    lighting.Ambient = Color3.fromRGB(10, 10, 10)
-    lighting.ExposureCompensation = 0.6
-
-    -- 3. 既存の全オブジェクトをスキャン（漏れを無くす）
-    for _, v in workspace:GetDescendants() do
+    -- 3. 全パーツをスキャン（既存のマップ用）
+    for _, v in pairs(game.Workspace:GetDescendants()) do
         ApplyDesignBlack(v)
     end
 end
 
--- 【重要】新しいパーツが追加された瞬間にデザインを適用
-workspace.DescendantAdded:Connect(ApplyDesignBlack)
+-- 【重要】新しく読み込まれたマップパーツも即座に黒くする
+game.Workspace.DescendantAdded:Connect(ApplyDesignBlack)
 
--- 1秒おきの高速監視
+-- 1秒おきのループで設定を死守
 task.spawn(function()
     while true do
-        pcall(ApplyFinalAdjustment)
+        pcall(ApplyFinalVisuals)
         task.wait(1)
     end
 end)
+
+print("SKY SCRIPT: Total Blackout Active (Error-Free)!")
