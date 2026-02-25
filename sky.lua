@@ -1,95 +1,70 @@
--- [[ 漆念：不退転・空固定 ＆ 建造物黒化プロトコル ]]
+-- [[ 漆念：成功確定コード・視認性重視ループ ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local localPlayer = game:GetService("Players").LocalPlayer
 
-local isTransparent = false
-
--- 1. 空を「削除不能」にして固定する
--- ゲーム側がSkyを消しても、即座に作り直してIDを叩き込みます
-local function EnsureSky()
-    local sky = lighting:FindFirstChildOfClass("Sky")
-    if not sky then
-        sky = Instance.new("Sky")
-        sky.Name = "FixedSky"
-        sky.Parent = lighting
+-- 1. 空の作成と固定（成功した手順をそのまま使用）
+local function ForceSky()
+    -- 既存のSkyをクリアして競合を防ぐ
+    for _, obj in pairs(lighting:GetChildren()) do
+        if obj:IsA("Sky") then obj:Destroy() end
     end
 
-    -- あなたの指定した成功IDを固定
+    local sky = Instance.new("Sky")
+    sky.Parent = lighting
     sky.SkyboxFt = "rbxassetid://72529916859362"
     sky.SkyboxBk = "rbxassetid://89515271903361"
     sky.SkyboxRt = "rbxassetid://83741654156826"
     sky.SkyboxLf = "rbxassetid://116760075528148"
     sky.SkyboxUp = "rbxassetid://119892967613407"
     sky.SkyboxDn = "rbxassetid://123559461938777"
-    
-    lighting.FogEnd = 100000
-    lighting.SunTextureId = ""
+    sky.SunTextureId = ""
 end
 
--- 毎フレームチェック（上書き・削除対策）
-RunService.RenderStepped:Connect(EnsureSky)
+-- 2. 黒くしすぎない環境設定
+local function ForceBalancedBlack()
+    -- ライティング調整
+    lighting.ClockTime = 0 
+    lighting.Brightness = 0.5 -- 完全に0にせず、わずかに光を残す
+    lighting.OutdoorAmbient = Color3.fromRGB(25, 25, 25) -- ほんのり明るいグレーで影を緩和
+    lighting.Ambient = Color3.fromRGB(10, 10, 10) -- 全くの無光状態を避ける
+    lighting.ExposureCompensation = 0 -- 露出を下げすぎない
 
--- 2. 建造物・デコイの黒化（以前の成功ロジック）
-local function ApplyStyle(obj)
-    if not obj:IsA("BasePart") or obj:IsA("Terrain") then return end
-    if obj:IsDescendantOf(localPlayer.Character) then return end
-
-    pcall(function()
-        local origT = obj:GetAttribute("OrigT")
-        if origT == nil then
-            origT = obj.Transparency
-            obj:SetAttribute("OrigT", origT)
-        end
-
-        if isTransparent then
-            obj.Transparency = 0.5
-            obj.Material = Enum.Material.Glass
-            obj.Color = Color3.fromRGB(150, 150, 255)
-        else
-            if origT > 0 then
-                obj.Transparency = 1 -- 透明パーツは消去
-            else
-                obj.Transparency = 0
-                obj.Color = Color3.new(0, 0, 0)
-                obj.Material = Enum.Material.SmoothPlastic
-                
-                for _, child in ipairs(obj:GetChildren()) do
-                    if child:IsA("Decal") or child:IsA("Texture") then
-                        child.Transparency = 1
-                    end
+    -- 建造物の塗りつぶし
+    for _, v in pairs(game.Workspace:GetDescendants()) do
+        if v:IsA("BasePart") and not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
+            pcall(function()
+                -- 透明なパーツ（バリアなど）は無視して、不透明な壁だけを黒くする
+                if v.Transparency < 0.5 then
+                    -- 真っ黒(0,0,0)ではなく、質感の残るダークグレー
+                    v.Color = Color3.fromRGB(15, 15, 15) 
+                    
+                    -- 反射をわずかに入れることで、空の光を受けて形が判別しやすくなる
+                    v.Reflectance = 0.05 
                 end
-            end
+            end)
+        elseif v:IsA("Texture") or v:IsA("Decal") then
+            -- 的などの装飾は透明にする
+            v.Transparency = 1
         end
-    end)
-end
-
--- 全体リフレッシュ
-local function FullRefresh()
-    for _, item in ipairs(game.Workspace:GetDescendants()) do
-        ApplyStyle(item)
     end
 end
 
--- Pキー切り替え
-UserInputService.InputBegan:Connect(function(input, gp)
-    if not gp and input.KeyCode == Enum.KeyCode.P then
-        isTransparent = not isTransparent
-        FullRefresh()
-    end
-end)
-
--- 監視と定期ループ
-game.Workspace.DescendantAdded:Connect(ApplyStyle)
+-- 3. 死守ループ
+-- 空は10秒おきにチェック（安定性重視）
 task.spawn(function()
     while true do
-        FullRefresh()
-        task.wait(1.5)
+        pcall(ForceSky)
+        task.wait(10)
     end
 end)
 
-FullRefresh()
-print("--- Absolute Sky Lock & Blackout: Force Active ---")
+-- 地形とライティングは定期的に上書き（負荷を抑えつつ維持）
+task.spawn(function()
+    print("--- Balanced Blackout System Online ---")
+    while true do
+        pcall(ForceBalancedBlack)
+        task.wait(5)
+    end
+end)
