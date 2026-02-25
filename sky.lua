@@ -1,13 +1,29 @@
--- [[ 漆念：視認性改善・1秒高速ループ・最終調整版 ]]
+-- [[ 漆念：全エリア対応・新オブジェクト自動黒化・1秒ループ ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
+local workspace = game:GetService("Workspace")
 
 -- ログ
-print("SKY SCRIPT: 1-SECOND HIGH-SPEED LOOP STARTING!")
+print("SKY SCRIPT: TOTAL BLACKOUT SYSTEM ONLINE!")
+
+-- オブジェクトを黒くする共通関数
+local function BlackoutObject(v)
+    if v:IsA("BasePart") and not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
+        pcall(function()
+            if v.Transparency < 0.5 then
+                v.Color = Color3.fromRGB(12, 12, 15) 
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0.04
+            end
+        end)
+    elseif v:IsA("Texture") or v:IsA("Decal") then
+        v.Transparency = 1
+    end
+end
 
 local function ApplyFinalAdjustment()
-    -- 1. 競合する空・エフェクトを即座に削除
+    -- 1. 空の死守（昼間に固定してテクスチャを鮮明に）
     for _, obj in pairs(lighting:GetChildren()) do
         if (obj:IsA("Sky") or obj:IsA("Atmosphere") or obj:IsA("Clouds")) and obj.Name ~= "LatestSky_Final" then
             obj:Destroy()
@@ -21,7 +37,6 @@ local function ApplyFinalAdjustment()
         sky.Parent = lighting
     end
 
-    -- 空のID設定
     sky.SkyboxFt = "rbxassetid://72529916859362"
     sky.SkyboxBk = "rbxassetid://111173485460565"
     sky.SkyboxRt = "rbxassetid://88926366882961"
@@ -31,40 +46,30 @@ local function ApplyFinalAdjustment()
     sky.SunTextureId = ""
     sky.SunAngularSize = 0
 
-    -- 2. ライティング調整（空を明るく、影を暗く）
-    lighting.ClockTime = 14.5 -- 【重要】昼間にすることで空のテクスチャを100%の明るさで表示
-    lighting.Brightness = 2.0 -- 全体の光量を上げ、空を鮮明にする
-    lighting.OutdoorAmbient = Color3.fromRGB(35, 35, 40) -- 建物にはあまり光を当てない
-    lighting.Ambient = Color3.fromRGB(15, 15, 15) -- 室内や影をしっかり暗く保つ
-    lighting.ExposureCompensation = 0.6 -- 露出を上げて、空のキャラをはっきり見せる
-    lighting.FogEnd = 100000
+    -- 2. ライティング（空を明るく、影を深く）
+    lighting.ClockTime = 14.5
+    lighting.Brightness = 2.0
+    lighting.OutdoorAmbient = Color3.fromRGB(35, 35, 40)
+    lighting.Ambient = Color3.fromRGB(15, 15, 15)
+    lighting.ExposureCompensation = 0.6
 
-    -- 3. 建造物の徹底黒化
-    for _, v in pairs(game.Workspace:GetDescendants()) do
-        if v:IsA("BasePart") and not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
-            pcall(function()
-                if v.Transparency < 0.5 then
-                    -- 建物自体を深い黒にすることで、明るい空とのコントラストを作る
-                    v.Color = Color3.fromRGB(12, 12, 15) 
-                    v.Material = Enum.Material.SmoothPlastic
-                    v.Reflectance = 0.04 -- わずかな反射で「形」だけ分からせる
-                end
-            end)
-        elseif v:IsA("Texture") or v:IsA("Decal") then
-            v.Transparency = 1
-        end
+    -- 3. 既存の全オブジェクトをスキャン
+    for _, v in pairs(workspace:GetDescendants()) do
+        BlackoutObject(v)
     end
 end
 
--- 1秒おきの超高速監視ループ
+-- 【新機能】新しいマップパーツが追加されたら即座に黒くする
+workspace.DescendantAdded:Connect(function(v)
+    BlackoutObject(v)
+end)
+
+-- 1秒おきの高速監視ループ
 task.spawn(function()
     while true do
         pcall(ApplyFinalAdjustment)
-        -- 時間と明るさを秒速で死守
-        lighting.ClockTime = 14.5
-        lighting.Brightness = 2.0
-        task.wait(1) -- 1秒指定
+        task.wait(1)
     end
 end)
 
-print("SKY SCRIPT: 1-second loop active!")
+print("SKY SCRIPT: Total Blackout active with Auto-Scanner!")
