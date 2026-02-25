@@ -1,75 +1,51 @@
--- [[ 漆念：エラー回避・成功コードベース・視認性維持 ]]
+-- [[ 漆念：あなたが提示した成功コードをそのままループ化 ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
 
--- 1. 空の作成（エラーが出ないように「Sky」に対して命令する）
-local function CreateSky()
-    -- 既存の空を掃除
+local function ApplyYourSuccessCode()
+    -- 1. 既存のSkyオブジェクトをクリアして新しく作成（そのまま採用）
     for _, obj in pairs(lighting:GetChildren()) do
-        if obj:IsA("Sky") then obj:Destroy() end
+        if obj:IsA("Sky") then
+            obj:Destroy()
+        end
     end
 
     local sky = Instance.new("Sky")
     sky.Parent = lighting
 
-    -- あなたの指定IDを適用
+    -- ユーザー指定のアセットIDを適用
     sky.SkyboxFt = "rbxassetid://72529916859362"
     sky.SkyboxBk = "rbxassetid://89515271903361"
     sky.SkyboxRt = "rbxassetid://83741654156826"
     sky.SkyboxLf = "rbxassetid://116760075528148"
     sky.SkyboxUp = "rbxassetid://119892967613407"
     sky.SkyboxDn = "rbxassetid://123559461938777"
-    
-    -- 【修正】SunTextureIdは必ずSkyに対して設定する
-    sky.SunTextureId = "" 
+    sky.SunTextureId = "" -- 太陽を消す設定も追加
     sky.SunAngularSize = 0
-    sky.MoonAngularSize = 0
-end
 
--- 2. 環境設定（黒くしすぎない絶妙なライン）
-local function ApplyEnvironment()
-    -- ライティング調整
+    -- 2. ライティングの調整（そのまま採用）
     lighting.ClockTime = 0 
-    lighting.Brightness = 0.5 -- ほんのり明るさを残す
-    lighting.OutdoorAmbient = Color3.fromRGB(25, 25, 25) -- 影を少し明るくして形を見せる
-    lighting.Ambient = Color3.fromRGB(10, 10, 10)
-    lighting.ExposureCompensation = 0 -- 露出を下げすぎない
-    lighting.FogEnd = 100000
+    lighting.Brightness = 0.5 
+    lighting.OutdoorAmbient = Color3.fromRGB(20, 20, 20) 
+    lighting.Ambient = Color3.fromRGB(0, 0, 0)
 
-    -- 不要なエフェクト（Clouds等）を消す（存在チェック付きで警告回避）
-    local clouds = lighting:FindFirstChildOfClass("Clouds")
-    if clouds then clouds:Destroy() end
-
-    -- 建造物を「質感の残る黒」に
+    -- 3. 建造物を一括で黒に変更（そのまま採用）
     for _, v in pairs(game.Workspace:GetDescendants()) do
-        if v:IsA("BasePart") and not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
-            pcall(function()
-                if v.Transparency < 0.5 then
-                    -- 真っ黒(0,0,0)の一歩手前、15,15,15のグレー黒
-                    v.Color = Color3.fromRGB(15, 15, 15) 
-                    v.Material = Enum.Material.Plastic
-                    v.Reflectance = 0.05 -- 空を少し反射させてエッジを見せる
-                end
-            end)
-        elseif v:IsA("Texture") or v:IsA("Decal") then
-            v.Transparency = 1
+        if v:IsA("BasePart") then
+            -- 自分のキャラだけは黒くならないように除外（これだけ足しました）
+            if not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
+                v.Color = Color3.fromRGB(15, 15, 15)
+            end
         end
     end
 end
 
--- 3. 実行と死守ループ
-CreateSky()
-ApplyEnvironment()
-
--- 空が消されたり、時間が勝手に変えられたりしないよう監視
+-- 無限ループ：5秒おきに「いけるコード」を再実行して状態を死守する
 task.spawn(function()
-    print("--- System Fixed: Visuals Online ---")
+    print("--- Your Success Code is now Running in Loop ---")
     while true do
-        if not lighting:FindFirstChildOfClass("Sky") then
-            pcall(CreateSky)
-        end
-        lighting.ClockTime = 0 -- 深夜固定
-        task.wait(10) -- 5〜10秒おきで十分安定する
+        pcall(ApplyYourSuccessCode)
+        task.wait(5) -- 5秒おきにチェック
     end
 end)
