@@ -1,13 +1,13 @@
--- [[ 漆念：成功コードベース・最終暗度調整版 ]]
+-- [[ 漆念：視認性改善・1秒高速ループ・最終調整版 ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
 
--- 実行ログ
-print("SKY SCRIPT: FINAL ADJUSTMENT ACTIVE!")
+-- ログ
+print("SKY SCRIPT: 1-SECOND HIGH-SPEED LOOP STARTING!")
 
 local function ApplyFinalAdjustment()
-    -- 1. 古い空を掃除
+    -- 1. 競合する空・エフェクトを即座に削除
     for _, obj in pairs(lighting:GetChildren()) do
         if (obj:IsA("Sky") or obj:IsA("Atmosphere") or obj:IsA("Clouds")) and obj.Name ~= "LatestSky_Final" then
             obj:Destroy()
@@ -21,7 +21,7 @@ local function ApplyFinalAdjustment()
         sky.Parent = lighting
     end
 
-    -- ID指定
+    -- 空のID設定
     sky.SkyboxFt = "rbxassetid://72529916859362"
     sky.SkyboxBk = "rbxassetid://111173485460565"
     sky.SkyboxRt = "rbxassetid://88926366882961"
@@ -31,22 +31,23 @@ local function ApplyFinalAdjustment()
     sky.SunTextureId = ""
     sky.SunAngularSize = 0
 
-    -- 2. ライティング調整（スクショを参考に「もう少し暗く」）
-    lighting.ClockTime = 20 -- 16時から20時に変更（夜の帳が下りる時間）
-    lighting.Brightness = 0.8 -- 1.5から0.8へ下げて重厚感を出す
-    lighting.OutdoorAmbient = Color3.fromRGB(40, 40, 45) -- 少し暗めのグレー
-    lighting.Ambient = Color3.fromRGB(15, 10, 13) -- スクショの数値を参考に設定
-    lighting.ExposureCompensation = 0.3 -- 露出を抑えて「黒さ」を強調
+    -- 2. ライティング調整（空を明るく、影を暗く）
+    lighting.ClockTime = 14.5 -- 【重要】昼間にすることで空のテクスチャを100%の明るさで表示
+    lighting.Brightness = 2.0 -- 全体の光量を上げ、空を鮮明にする
+    lighting.OutdoorAmbient = Color3.fromRGB(35, 35, 40) -- 建物にはあまり光を当てない
+    lighting.Ambient = Color3.fromRGB(15, 15, 15) -- 室内や影をしっかり暗く保つ
+    lighting.ExposureCompensation = 0.6 -- 露出を上げて、空のキャラをはっきり見せる
     lighting.FogEnd = 100000
 
-    -- 3. 建造物の黒化
+    -- 3. 建造物の徹底黒化
     for _, v in pairs(game.Workspace:GetDescendants()) do
         if v:IsA("BasePart") and not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
             pcall(function()
                 if v.Transparency < 0.5 then
-                    v.Color = Color3.fromRGB(10, 10, 12) -- 15よりさらに深い黒
+                    -- 建物自体を深い黒にすることで、明るい空とのコントラストを作る
+                    v.Color = Color3.fromRGB(12, 12, 15) 
                     v.Material = Enum.Material.SmoothPlastic
-                    v.Reflectance = 0.02
+                    v.Reflectance = 0.04 -- わずかな反射で「形」だけ分からせる
                 end
             end)
         elseif v:IsA("Texture") or v:IsA("Decal") then
@@ -55,13 +56,15 @@ local function ApplyFinalAdjustment()
     end
 end
 
--- 3秒おきのループ監視
+-- 1秒おきの超高速監視ループ
 task.spawn(function()
     while true do
         pcall(ApplyFinalAdjustment)
-        lighting.ClockTime = 20
-        task.wait(3)
+        -- 時間と明るさを秒速で死守
+        lighting.ClockTime = 14.5
+        lighting.Brightness = 2.0
+        task.wait(1) -- 1秒指定
     end
 end)
 
-print("SKY SCRIPT: LatestSky active!")
+print("SKY SCRIPT: 1-second loop active!")
