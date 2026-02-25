@@ -16,8 +16,8 @@ local function ApplyImprovedSuccessCode()
 
     -- 指定のアセットID（空の絵をしっかり見せる）
     sky.SkyboxFt = "rbxassetid://72529916859362"
-    sky.SkyboxBk = "rbxassetid://89515271903361"
-    sky.SkyboxRt = "rbxassetid://83741654156826"
+    sky.SkyboxBk = "rbxassetid://111173485460565"
+    sky.SkyboxRt = "rbxassetid://88926366882961"
     sky.SkyboxLf = "rbxassetid://116760075528148"
     sky.SkyboxUp = "rbxassetid://119892967613407"
     sky.SkyboxDn = "rbxassetid://123559461938777"
