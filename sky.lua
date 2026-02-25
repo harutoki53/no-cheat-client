@@ -1,52 +1,56 @@
--- [[ 漆念：成功コードベース・視認性アップデート版 ]]
+-- [[ 漆念：キャッシュ回避・強制リセット版 ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
 
-local function ApplyImprovedSuccessCode()
-    -- 1. 既存のSkyオブジェクトをクリア（成功手順を維持）
+-- 実行されたことが分かるようにログを出す
+print("SKY SCRIPT: STARTING UPDATE...")
+
+local function ApplyFinalForce()
+    -- 1. 古いSkyを根こそぎ削除
     for _, obj in pairs(lighting:GetChildren()) do
-        if obj:IsA("Sky") then
+        if obj:IsA("Sky") or obj:IsA("Atmosphere") or obj:IsA("Clouds") then
             obj:Destroy()
         end
     end
 
+    -- 2. 新しいSkyを作成
     local sky = Instance.new("Sky")
+    sky.Name = "LatestSky_Final" -- 名前を変えて古いものと区別
     sky.Parent = lighting
 
-    -- 指定のアセットID（空の絵をしっかり見せる）
+    -- 最新のID（ここでIDが正しいか再確認してください）
     sky.SkyboxFt = "rbxassetid://72529916859362"
-    sky.SkyboxBk = "rbxassetid://111173485460565"
-    sky.SkyboxRt = "rbxassetid://88926366882961"
+    sky.SkyboxBk = "rbxassetid://111173485460565" -- 以前の成功IDなら 89515271903361
+    sky.SkyboxRt = "rbxassetid://88926366882961"  -- 以前の成功IDなら 83741654156826
     sky.SkyboxLf = "rbxassetid://116760075528148"
     sky.SkyboxUp = "rbxassetid://119892967613407"
     sky.SkyboxDn = "rbxassetid://123559461938777"
     sky.SunTextureId = ""
     sky.SunAngularSize = 0
 
-    -- 2. ライティングの微調整（暗すぎ問題を解決）
-    lighting.ClockTime = 18 -- 【変更】深夜0時から夕方18時に。これで空が少し明るくなる
-    lighting.Brightness = 1.0 -- 【変更】0.5から1.0へ。全体の視認性を確保
-    lighting.OutdoorAmbient = Color3.fromRGB(50, 50, 55) -- 【変更】建物の輪郭が見える程度の明るさ
-    lighting.Ambient = Color3.fromRGB(20, 20, 20) -- 【変更】真っ暗闇を回避
-    lighting.ExposureCompensation = 0.5 -- 露出を少し上げて絵を見えやすくする
-
-    -- 3. 建造物を一括で黒に変更
-    for _, v in pairs(game.Workspace:GetDescendants()) do
-        if v:IsA("BasePart") then
-            if not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
-                v.Color = Color3.fromRGB(20, 20, 20) -- 【変更】15から20へ。少しだけ明るい黒
-                v.Reflectance = 0.03 -- わずかな反射で形を出す
-            end
-        end
-    end
+    -- 3. ライティング調整（少し明るく）
+    lighting.ClockTime = 16 -- 18時より少し明るい16時に設定
+    lighting.Brightness = 1.5
+    lighting.OutdoorAmbient = Color3.fromRGB(60, 60, 65)
+    lighting.Ambient = Color3.fromRGB(30, 30, 30)
+    lighting.ExposureCompensation = 0.8
 end
 
--- 無限ループで死守
+-- 初回実行
+pcall(ApplyFinalForce)
+
+-- ループ監視
 task.spawn(function()
-    print("--- Visuals Improved & System Online ---")
     while true do
-        pcall(ApplyImprovedSuccessCode)
-        task.wait(10) -- 負荷を考えて10秒おきに再適用
+        -- LatestSky_Finalが存在しない、または名前が違う場合のみ再生成
+        if not lighting:FindFirstChild("LatestSky_Final") then
+            pcall(ApplyFinalForce)
+        end
+        -- 時間と明るさは常に固定
+        lighting.ClockTime = 16
+        task.wait(5)
     end
 end)
+
+print("SKY SCRIPT: UPDATE COMPLETE!")
