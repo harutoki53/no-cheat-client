@@ -1,12 +1,10 @@
--- [[ 漆念：成功確定コード・視認性重視ループ ]]
+-- [[ 漆念：エラー修正・視認性維持・完全版 ]]
 repeat task.wait() until game:IsLoaded()
 
 local lighting = game:GetService("Lighting")
-local RunService = game:GetService("RunService")
 
--- 1. 空の作成と固定（成功した手順をそのまま使用）
-local function ForceSky()
-    -- 既存のSkyをクリアして競合を防ぐ
+-- 1. 空の作成（一度だけ実行し、その後は監視のみ）
+local function CreateSky()
     for _, obj in pairs(lighting:GetChildren()) do
         if obj:IsA("Sky") then obj:Destroy() end
     end
@@ -19,52 +17,46 @@ local function ForceSky()
     sky.SkyboxLf = "rbxassetid://116760075528148"
     sky.SkyboxUp = "rbxassetid://119892967613407"
     sky.SkyboxDn = "rbxassetid://123559461938777"
-    sky.SunTextureId = ""
+    sky.SunTextureId = "" -- 正しくSkyに対して設定
+    sky.SunAngularSize = 0
 end
 
--- 2. 黒くしすぎない環境設定
-local function ForceBalancedBlack()
-    -- ライティング調整
+-- 2. ライティングと建造物の調整（黒くしすぎない）
+local function ApplyVisuals()
+    -- ライティング固定（エラーの原因となる不要な命令を削除）
     lighting.ClockTime = 0 
-    lighting.Brightness = 0.5 -- 完全に0にせず、わずかに光を残す
-    lighting.OutdoorAmbient = Color3.fromRGB(25, 25, 25) -- ほんのり明るいグレーで影を緩和
-    lighting.Ambient = Color3.fromRGB(10, 10, 10) -- 全くの無光状態を避ける
-    lighting.ExposureCompensation = 0 -- 露出を下げすぎない
+    lighting.Brightness = 0.5 
+    lighting.OutdoorAmbient = Color3.fromRGB(20, 20, 20) 
+    lighting.Ambient = Color3.fromRGB(5, 5, 5)
 
-    -- 建造物の塗りつぶし
+    -- 建造物の塗りつぶし（負荷対策：一回だけ実行するか、長い間隔で回す）
     for _, v in pairs(game.Workspace:GetDescendants()) do
         if v:IsA("BasePart") and not v:IsDescendantOf(game.Players.LocalPlayer.Character) then
             pcall(function()
-                -- 透明なパーツ（バリアなど）は無視して、不透明な壁だけを黒くする
                 if v.Transparency < 0.5 then
-                    -- 真っ黒(0,0,0)ではなく、質感の残るダークグレー
-                    v.Color = Color3.fromRGB(15, 15, 15) 
-                    
-                    -- 反射をわずかに入れることで、空の光を受けて形が判別しやすくなる
-                    v.Reflectance = 0.05 
+                    v.Color = Color3.fromRGB(15, 15, 15)
+                    v.Reflectance = 0.05
                 end
             end)
         elseif v:IsA("Texture") or v:IsA("Decal") then
-            -- 的などの装飾は透明にする
             v.Transparency = 1
         end
     end
 end
 
--- 3. 死守ループ
--- 空は10秒おきにチェック（安定性重視）
-task.spawn(function()
-    while true do
-        pcall(ForceSky)
-        task.wait(10)
-    end
-end)
+-- 3. 実行とループ
+CreateSky()
+ApplyVisuals()
 
--- 地形とライティングは定期的に上書き（負荷を抑えつつ維持）
+-- 監視ループ（空が消された時だけ再生成するようにして負荷を激減させる）
 task.spawn(function()
-    print("--- Balanced Blackout System Online ---")
+    print("--- System Fixed & Online ---")
     while true do
-        pcall(ForceBalancedBlack)
+        if not lighting:FindFirstChildOfClass("Sky") then
+            pcall(CreateSky)
+        end
+        -- ライティングの強制維持
+        lighting.ClockTime = 0
         task.wait(5)
     end
 end)
