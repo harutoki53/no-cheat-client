@@ -1,46 +1,41 @@
--- [[ 漆念：オーバーレイ・ドームプロトコル ]]
+-- [[ 漆念：不退転・空固定 ＆ 建造物黒化プロトコル ]]
 repeat task.wait() until game:IsLoaded()
 
+local lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local localPlayer = game:GetService("Players").LocalPlayer
-local camera = workspace.CurrentCamera
 
 local isTransparent = false
 
--- 1. 物理的な「空のドーム」を作成
-local skyDome = Instance.new("Part")
-skyDome.Name = "SkyOverlay"
-skyDome.Size = Vector3.new(2000, 2000, 2000) -- マップを包む巨大サイズ
-skyDome.Shape = Enum.PartType.Ball
-skyDome.Transparency = 0
-skyDome.CanCollide = false
-skyDome.CanTouch = false
-skyDome.CanQuery = false
-skyDome.CastShadow = false
-skyDome.Anchored = true
-skyDome.Material = Enum.Material.SmoothPlastic
-skyDome.Parent = workspace
+-- 1. 空を「削除不能」にして固定する
+-- ゲーム側がSkyを消しても、即座に作り直してIDを叩き込みます
+local function EnsureSky()
+    local sky = lighting:FindFirstChildOfClass("Sky")
+    if not sky then
+        sky = Instance.new("Sky")
+        sky.Name = "FixedSky"
+        sky.Parent = lighting
+    end
 
--- 内側にテクスチャを貼る（Meshにして内側を表示）
-local mesh = Instance.new("SpecialMesh", skyDome)
-mesh.MeshType = Enum.MeshType.Sphere
-mesh.Scale = Vector3.new(-1, -1, -1) -- 反転させて「内側」を向かせる
+    -- あなたの指定した成功IDを固定
+    sky.SkyboxFt = "rbxassetid://72529916859362"
+    sky.SkyboxBk = "rbxassetid://89515271903361"
+    sky.SkyboxRt = "rbxassetid://83741654156826"
+    sky.SkyboxLf = "rbxassetid://116760075528148"
+    sky.SkyboxUp = "rbxassetid://119892967613407"
+    sky.SkyboxDn = "rbxassetid://123559461938777"
+    
+    lighting.FogEnd = 100000
+    lighting.SunTextureId = ""
+end
 
--- あなたの星空IDをテクスチャとして適用
--- ※球体なので1枚のIDで全方位をカバーするか、Decalを6面に貼る調整
-local skyTex = Instance.new("Decal", skyDome)
-skyTex.Texture = "rbxassetid://72529916859362" -- メインの星空ID
-skyTex.Face = Enum.NormalId.Front -- 全面に広がるよう調整
+-- 毎フレームチェック（上書き・削除対策）
+RunService.RenderStepped:Connect(EnsureSky)
 
--- カメラに追従させて「常に空」として機能させる
-RunService.RenderStepped:Connect(function()
-    skyDome.Position = camera.CFrame.Position
-end)
-
--- 2. 建造物の黒化（ここは以前の成功ロジックを継承）
+-- 2. 建造物・デコイの黒化（以前の成功ロジック）
 local function ApplyStyle(obj)
-    if not obj:IsA("BasePart") or obj == skyDome or obj:IsA("Terrain") then return end
+    if not obj:IsA("BasePart") or obj:IsA("Terrain") then return end
     if obj:IsDescendantOf(localPlayer.Character) then return end
 
     pcall(function()
@@ -72,6 +67,7 @@ local function ApplyStyle(obj)
     end)
 end
 
+-- 全体リフレッシュ
 local function FullRefresh()
     for _, item in ipairs(game.Workspace:GetDescendants()) do
         ApplyStyle(item)
@@ -86,13 +82,14 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
+-- 監視と定期ループ
 game.Workspace.DescendantAdded:Connect(ApplyStyle)
 task.spawn(function()
     while true do
         FullRefresh()
-        task.wait(2)
+        task.wait(1.5)
     end
 end)
 
 FullRefresh()
-print("--- Overlay Sky System: Physical Layer Active ---")
+print("--- Absolute Sky Lock & Blackout: Force Active ---")
